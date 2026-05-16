@@ -1,0 +1,189 @@
+﻿@page "/players"
+@using CubanSox.Web.Models
+@using System.IO
+@using Microsoft.AspNetCore.Components.Forms
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h4" Class="mb-4">Gestión del Roster</MudText>
+
+
+<MudPaper Class="pa-6 mb-6" Elevation="4">
+    <MudText Typo="Typo.h6" Class="mb-4">@(isEditing ? "Editar Jugador" : "Registrar Nuevo Jugador")</MudText>
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudTextField @bind-Value="playerModel.Name" Label="Nombre Completo" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+        
+        <MudItem xs="6" sm="2">
+            <MudNumericField @bind-Value="playerModel.Number" Label="Número (#)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Max="99" />
+        </MudItem>
+
+        <MudItem xs="6" sm="3">
+           
+            <MudDatePicker Label="Fecha de Nacimiento" @bind-Date="playerModel.DOB" DateFormat="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" Editable="true" />
+        </MudItem>
+
+        <MudItem xs="12" sm="3">
+            <MudSelect T="int" Label="Equipo" @bind-Value="playerModel.TeamId" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem Value="0">Seleccione un equipo...</MudSelectItem>
+                @foreach (var team in teams)
+                {
+                    <MudSelectItem Value="@team.Id">@team.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="4" Class="d-flex align-center">
+            <InputFile id="photoInput" OnChange="UploadPhoto" hidden accept=".jpg,.jpeg,.png" />
+            <MudButton HtmlTag="label" Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PhotoCamera" for="photoInput">
+                Subir Foto
+            </MudButton>
+            @if (!string.IsNullOrEmpty(playerModel.Photo))
+            {
+                <MudImage Src="@playerModel.Photo" Width="60" Height="60" ObjectFit="ObjectFit.Cover" Class="ml-4 rounded-circle shadow" />
+            }
+        </MudItem>
+
+        <MudItem xs="12" sm="8" Class="d-flex align-center justify-end gap-2">
+            @if (isEditing)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="CancelEdit">Cancelar</MudButton>
+            }
+            <MudButton Variant="Variant.Filled" Color="isEditing ? Color.Warning : Color.Primary" OnClick="SavePlayer" Size="Size.Large">
+                @(isEditing ? "Actualizar Jugador" : "Guardar Jugador")
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+
+<MudTable Items="@players" Hover="true" Loading="@loading" Elevation="2">
+    <HeaderContent>
+        <MudTh>Foto</MudTh>
+        <MudTh>Nombre</MudTh>
+        <MudTh>#</MudTh>
+        <MudTh>Edad</MudTh>
+        <MudTh>Equipo</MudTh>
+        <MudTh Style="text-align:right">Acciones</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+       <MudTd DataLabel="Foto">
+    <div class="d-flex align-center">
+        @if (!string.IsNullOrEmpty(context.Photo))
+        {
+            
+            <MudAvatar Size="Size.Large" Elevation="2">
+                <MudImage Src="@context.Photo" ObjectFit="ObjectFit.Cover" Alt="Foto Jugador" />
+            </MudAvatar>
+        }
+        else
+        {
+           
+            <MudAvatar Color="Color.Primary" Size="Size.Large" Elevation="2">
+                @(string.IsNullOrEmpty(context.Name) ? "?" : context.Name[0].ToString().ToUpper())
+            </MudAvatar>
+        }
+    </div>
+</MudTd>
+        <MudTd DataLabel="Nombre">@context.Name</MudTd>
+        <MudTd DataLabel="#">@context.Number</MudTd>
+        <MudTd DataLabel="Edad">
+            @(context.DOB.HasValue ? CalculateAge(context.DOB.Value).ToString() : "-")
+        </MudTd>
+        @* 
+        <MudTd DataLabel="Fecha Nac.">
+            @(context.DOB.HasValue? context.DOB.Value.ToString("dd/MM/yyyy") : "-")
+        </MudTd>
+        *@
+        <MudTd DataLabel="Equipo">@context.Team?.Name</MudTd>
+        <MudTd Style="text-align:right">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" OnClick="@(() => PrepareEdit(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeletePlayer(context.Id))" />
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private List<Player> players = new();
+    private List<Team> teams = new();
+    private Player playerModel = new();
+    private bool loading = true;
+    private bool isEditing = false;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try {
+            players = await Http.GetFromJsonAsync<List<Player>>("api/Players") ?? new();
+            teams = await Http.GetFromJsonAsync<List<Team>>("api/Teams") ?? new();
+        } catch (Exception ex) {
+            Snackbar.Add("Error: " + ex.Message, Severity.Error);
+        } finally { loading = false; }
+    }
+
+    private async Task UploadPhoto(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        var resizedFile = await file.RequestImageFileAsync(file.ContentType, 300, 300);
+        using var ms = new MemoryStream();
+        await resizedFile.OpenReadStream(3000000).CopyToAsync(ms);
+        playerModel.Photo = $"data:{file.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+    }
+
+    private async Task SavePlayer()
+    {
+        if (playerModel.TeamId == 0) {
+            Snackbar.Add("Seleccione un equipo", Severity.Warning);
+            return;
+        }
+
+        HttpResponseMessage response;
+        if (isEditing)
+            response = await Http.PutAsJsonAsync($"api/Players/{playerModel.Id}", playerModel);
+        else
+            response = await Http.PostAsJsonAsync("api/Players", playerModel);
+
+        if (response.IsSuccessStatusCode) {
+            Snackbar.Add("Operación exitosa", Severity.Success);
+            CancelEdit();
+            await LoadData();
+        }
+    }
+
+    private void PrepareEdit(Player p)
+    {
+        isEditing = true;
+        playerModel = new Player {
+            Id = p.Id,
+            Name = p.Name,
+            Number = p.Number,
+            DOB = p.DOB,
+            Photo = p.Photo,
+            TeamId = p.TeamId
+        };
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+        playerModel = new Player();
+    }
+
+    private async Task DeletePlayer(int id)
+    {
+        await Http.DeleteAsync($"api/Players/{id}");
+        await LoadData();
+    }
+
+    // Función auxiliar para calcular la edad
+    private int CalculateAge(DateTime dob)
+    {
+        var today = DateTime.Today;
+        var age = today.Year - dob.Year;
+        if (dob.Date > today.AddYears(-age)) age--;
+        return age;
+    }
+}

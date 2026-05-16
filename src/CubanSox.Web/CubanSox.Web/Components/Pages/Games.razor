@@ -1,0 +1,203 @@
+﻿@page "/games"
+@using CubanSox.Web.Models
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudText Typo="Typo.h4" Class="mb-4">Calendario de Juegos</MudText>
+
+
+<MudPaper Class="pa-6 mb-6" Elevation="4">
+    <MudText Typo="Typo.h6" Class="mb-4">@(isEditing ? "Editar Juego" : "Programar Nuevo Juego")</MudText>
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudDatePicker Label="Fecha" @bind-Date="gameModel.Date" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudTimePicker Label="Hora" @bind-Time="gameModel.Time" Variant="Variant.Outlined" Margin="Margin.Dense" AmPm="true" />
+        </MudItem>
+        <MudItem xs="12" sm="12" md="6">
+            <MudTextField @bind-Value="gameModel.Field" Label="Campo / Estadio" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Ej: Estadio Latinoamericano" />
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudSelect T="int" Label="Equipo Visitante" @bind-Value="gameModel.VisitorTeamId" Variant="Variant.Outlined" Margin="Margin.Dense" AnchorOrigin="Origin.BottomCenter">
+                <MudSelectItem Value="0">Seleccione Visitante</MudSelectItem>
+                @foreach (var team in teams)
+                {
+                    <MudSelectItem Value="@team.Id">@team.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudSelect T="int" Label="Equipo Home (Club)" @bind-Value="gameModel.HomeTeamId" Variant="Variant.Outlined" Margin="Margin.Dense" AnchorOrigin="Origin.BottomCenter">
+                <MudSelectItem Value="0">Seleccione Home Team</MudSelectItem>
+                @foreach (var team in teams)
+                {
+                    <MudSelectItem Value="@team.Id">@team.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+      
+
+        <MudItem xs="12" Class="d-flex justify-end gap-2 mt-4">
+            @if (isEditing)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="CancelEdit">Cancelar</MudButton>
+            }
+            <MudButton Variant="Variant.Filled" Color="isEditing ? Color.Warning : Color.Primary" OnClick="SaveGame" Size="Size.Large" StartIcon="@Icons.Material.Filled.Save">
+                @(isEditing ? "Actualizar Juego" : "Guardar Juego")
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+
+<MudTable Items="@games" Hover="true" Loading="@loading" Elevation="2" Class="mb-8">
+    <HeaderContent>
+        <MudTh>Fecha / Hora</MudTh>
+        <MudTh>Estadio</MudTh>
+        <MudTh Style="text-align:center">Encuentro (Visitante vs Home)</MudTh>
+        <MudTh Style="text-align:right">Acciones</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Fecha">
+            <MudText Typo="Typo.body2"><b>@context.Date?.ToString("dd/MM/yyyy")</b></MudText>
+            <MudText Typo="Typo.caption">@(context.Time.HasValue ? DateTime.Today.Add(context.Time.Value).ToString("hh:mm tt") : "-")</MudText>
+        </MudTd>
+        <MudTd DataLabel="Estadio">@context.Field</MudTd>
+        <MudTd DataLabel="Encuentro">
+            <div class="d-flex align-center justify-center gap-4">
+        
+                <div class="d-flex flex-column align-center" style="width: 120px">
+                    <MudAvatar Size="Size.Large" Elevation="2">
+                        <MudImage Src="@context.VisitorTeam?.Logo" ObjectFit="ObjectFit.Cover" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.caption" Class="mt-1">@context.VisitorTeam?.Name</MudText>
+                </div>
+
+                <MudText Typo="Typo.h6">@(" @ ")</MudText> 
+
+        
+                <div class="d-flex flex-column align-center" style="width: 120px">
+                    <MudAvatar Size="Size.Large" Elevation="2">
+                        <MudImage Src="@context.HomeTeam?.Logo" ObjectFit="ObjectFit.Cover" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.caption" Class="mt-1">@context.HomeTeam?.Name</MudText>
+                </div>
+            </div>
+        </MudTd>
+        <MudTd Style="text-align:right">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" OnClick="@(() => PrepareEdit(context))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeleteGame(context.Id))" />
+            <MudIconButton Icon="@Icons.Material.Filled.Scoreboard"
+                           Color="Color.Warning"
+                           OnClick="@(() => OpenScoreDialog(context))"
+                           Title="Anotar Carreras" />
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private List<Game> games = new();
+    private List<Team> teams = new();
+    private Game gameModel = new() { Date = DateTime.Today };
+    private bool loading = true;
+    private bool isEditing = false;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try {
+            games = await Http.GetFromJsonAsync<List<Game>>("api/Games") ?? new();
+            teams = await Http.GetFromJsonAsync<List<Team>>("api/Teams") ?? new();
+        } catch (Exception ex) {
+            Snackbar.Add("Error al cargar: " + ex.Message, Severity.Error);
+        } finally { loading = false; }
+    }
+
+    private async Task OpenScoreDialog(Game game)
+    {
+        var parameters = new DialogParameters<GameScoreDialog> { { x => x.Game, game } };
+        //var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        //var dialog = await DialogService.ShowAsync<GameScoreDialog>("BoxScore", parameters, options);
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            BackdropClick = false // Evita que se cierre por error
+        };
+
+        var dialog = await DialogService.ShowAsync<GameScoreDialog>("Box Score Detallado", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadData(); // Recargar la lista de juegos para ver si algo cambió
+        }
+    }
+
+    private async Task SaveGame()
+    {
+        // Validaciones básicas
+        if (gameModel.HomeTeamId == 0 || gameModel.VisitorTeamId == 0) {
+            Snackbar.Add("Debe seleccionar ambos equipos", Severity.Warning);
+            return;
+        }
+        if (gameModel.HomeTeamId == gameModel.VisitorTeamId) {
+            Snackbar.Add("Un equipo no puede jugar contra sí mismo", Severity.Warning);
+            return;
+        }
+
+        // Limpiar objetos de navegación para evitar errores en la API
+        gameModel.HomeTeam = null;
+        gameModel.VisitorTeam = null;
+
+        HttpResponseMessage response;
+        if (isEditing)
+            response = await Http.PutAsJsonAsync($"api/Games/{gameModel.Id}", gameModel);
+        else
+            response = await Http.PostAsJsonAsync("api/Games", gameModel);
+
+        if (response.IsSuccessStatusCode) {
+            Snackbar.Add("Juego guardado correctamente", Severity.Success);
+            CancelEdit();
+            await LoadData();
+        } else {
+            Snackbar.Add("Error al guardar el juego", Severity.Error);
+        }
+    }
+
+    private void PrepareEdit(Game g)
+    {
+        isEditing = true;
+        gameModel = new Game {
+            Id = g.Id,
+            Date = g.Date,
+            Time = g.Time,
+            Field = g.Field,
+            HomeTeamId = g.HomeTeamId,
+            VisitorTeamId = g.VisitorTeamId
+        };
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+        gameModel = new Game { Date = DateTime.Today };
+    }
+
+    private async Task DeleteGame(int id)
+    {
+        var response = await Http.DeleteAsync($"api/Games/{id}");
+        if (response.IsSuccessStatusCode) {
+            Snackbar.Add("Juego eliminado", Severity.Info);
+            await LoadData();
+        }
+    }
+}

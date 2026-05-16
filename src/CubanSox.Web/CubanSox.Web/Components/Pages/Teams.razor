@@ -1,0 +1,229 @@
+﻿@page "/teams"
+@using CubanSox.Web.Models
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+@using Microsoft.AspNetCore.Components.Forms
+@using System.IO
+
+<MudText Typo="Typo.h4" Class="mb-4">Administración de Equipos</MudText>
+
+<MudPaper Class="pa-4 mb-4" Elevation="4">
+    <MudText Typo="Typo.h6" Class="mb-2">@(isEditing ? "Editar Equipo" : "Nuevo Equipo")</MudText>
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudTextField @bind-Value="newTeam.Name" Label="Nombre del Equipo" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </MudItem>
+
+        <MudItem xs="12" sm="4" Class="d-flex align-center">
+            <InputFile id="fileInput" OnChange="UploadFile" hidden accept=".jpg,.jpeg,.png" />
+            <MudButton HtmlTag="label" Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.CloudUpload" for="fileInput">
+                @(string.IsNullOrEmpty(newTeam.Logo) ? "Subir Logo" : "Cambiar Logo")
+            </MudButton>
+        </MudItem>
+
+        <MudItem xs="12" sm="1">
+            @if (!string.IsNullOrEmpty(newTeam.Logo))
+            {
+                <MudImage Src="@newTeam.Logo" Width="50" Height="50" ObjectFit="ObjectFit.Cover" Class="rounded-lg shadow" />
+            }
+        </MudItem>
+
+        <MudItem xs="12" sm="3" Class="d-flex align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="isEditing? Color.Warning: Color.Primary" OnClick="SaveTeam">
+                @(isEditing ? "Actualizar" : "Guardar")
+            </MudButton>
+
+            @if (isEditing)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="CancelEdit">Cancelar</MudButton>
+            }
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudTable Items="@teams" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@loading">
+    <HeaderContent>
+        <MudTh>Logo</MudTh>
+        <MudTh>Nombre</MudTh>
+        <MudTh Style="text-align:right">Acciones</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Logo">
+            @if (!string.IsNullOrEmpty(context.Logo))
+            {
+                <MudImage Src="@context.Logo" Width="40" Height="40" ObjectFit="ObjectFit.Cover" Class="rounded-circle shadow" />
+            }
+            else
+            {
+                <MudAvatar Color="Color.Default" Size="Size.Small">@context.Name.Substring(0,1)</MudAvatar>
+            }
+        </MudTd>
+        <MudTd DataLabel="Nombre">@context.Name</MudTd>
+        <MudTd DataLabel="Acciones" Style="text-align:right">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                           Color="Color.Info"
+                           OnClick="@(() => PrepareEdit(context))"
+                           Title="Editar" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Color="Color.Error"
+                           OnClick="@(() => DeleteTeam(context.Id))"
+                           Title="Eliminar" />
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private List<Team> teams = new();
+    private Team newTeam = new();
+    private bool loading = true;
+    private bool isEditing = false;
+
+    protected override async Task OnInitializedAsync() => await LoadTeams();
+
+    private async Task LoadTeams()
+    {
+        loading = true;
+        try {
+            teams = await Http.GetFromJsonAsync<List<Team>>("api/Teams") ?? new();
+        } catch (Exception ex) {
+            Snackbar.Add("Error: " + ex.Message, Severity.Error);
+        } finally { loading = false; }
+    }
+
+    // Cargar los datos en el formulario para editar
+    private void PrepareEdit(Team team)
+    {
+        isEditing = true;
+        // Creamos una copia para no modificar la tabla antes de guardar
+        newTeam = new Team
+        {
+            Id = team.Id,
+            Name = team.Name,
+            Logo = team.Logo
+        };
+    }
+
+    // Cancelar la edición
+    private void CancelEdit()
+    {
+        isEditing = false;
+        newTeam = new Team();
+    }
+
+    // Lógica para procesar la imagen
+    private async Task UploadFile(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            try
+            {
+                // Limitamos a 250x250 para que el Base64 no sea gigante
+                var resizedFile = await file.RequestImageFileAsync(file.ContentType, 250, 250);
+
+                using var ms = new MemoryStream();
+                // Abrimos el stream con un límite de seguridad (ej: 2MB)
+                await resizedFile.OpenReadStream(2048000).CopyToAsync(ms);
+
+                var buffer = ms.ToArray();
+                var base64String = Convert.ToBase64String(buffer);
+
+                newTeam.Logo = $"data:{file.ContentType};base64,{base64String}";
+
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add("Error: " + ex.Message, Severity.Error);
+            }
+        }
+    }
+
+    private async Task SaveTeam()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(newTeam.Name)) return;
+
+            HttpResponseMessage response;
+
+            if (isEditing)
+            {
+                // LLAMADA A PUT (Actualizar)
+                response = await Http.PutAsJsonAsync($"api/Teams/{newTeam.Id}", newTeam);
+            }
+            else
+            {
+                // LLAMADA A POST (Crear)
+                response = await Http.PostAsJsonAsync("api/Teams", newTeam);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(isEditing ? "Equipo actualizado" : "Equipo creado", Severity.Success);
+                CancelEdit(); // Limpia el formulario y resetea isEditing
+                await LoadTeams();
+            }
+            else
+            {
+                Snackbar.Add("Error al procesar la solicitud", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Error: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task SaveTeamOld()
+    {
+        try
+        {
+            // 1. Verificación básica
+            if (string.IsNullOrWhiteSpace(newTeam.Name))
+            {
+                Snackbar.Add("El nombre del equipo es obligatorio", Severity.Warning);
+                return;
+            }
+
+            loading = true; // Mostrar indicador de carga
+            StateHasChanged();
+
+            // 2. Intento de envío
+            var response = await Http.PostAsJsonAsync("api/Teams", newTeam);
+
+            // 3. Analizar respuesta
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Equipo '{newTeam.Name}' guardado con éxito", Severity.Success);
+                newTeam = new Team(); // Limpiar el formulario
+                await LoadTeams();    // Recargar la lista
+            }
+            else
+            {
+                // Leer el error que devuelve la API (si hay alguno)
+                var errorBody = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Error del servidor ({response.StatusCode}): {errorBody}", Severity.Error);
+                Console.WriteLine($"Error de API: {errorBody}");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Capturar errores de conexión o de red
+            Snackbar.Add("Error de conexión: " + ex.Message, Severity.Error);
+            Console.WriteLine(ex.ToString());
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteTeam(int id)
+    {
+        await Http.DeleteAsync($"api/Teams/{id}");
+        await LoadTeams();
+    }
+}

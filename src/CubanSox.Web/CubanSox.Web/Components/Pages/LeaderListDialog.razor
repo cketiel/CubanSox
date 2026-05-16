@@ -1,0 +1,228 @@
+﻿@using CubanSox.Web.Models
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudDialog Class="leader-dialog-container">
+    <TitleContent>
+        <div class="d-flex align-center justify-space-between w-100 pr-8">
+            <MudText Typo="Typo.h6" Style="color: white; font-weight: bold;">
+                Detalles del Liderato
+            </MudText>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Inherit"
+                       StartIcon="@Icons.Material.Filled.BarChart"
+                       OnClick="VerRankingCompleto"
+                       Style="color: white; border-color: rgba(255,255,255,0.5); text-transform: none;">
+                Ver ranking completo
+            </MudButton>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="leader-board-wrapper">
+            @* Encabezado Estilo Banner *@
+            <div class="leader-header">
+                <div class="header-main">@CategoryCode</div>
+                <div class="header-sub">LIDERATO</div>
+            </div>
+
+            <div class="main-content-flex">
+
+                @* Columna Izquierda *@
+                <div class="players-list">
+                    @for (int i = 0; i < Leaders.Count; i++)
+                    {
+                        var item = Leaders[i];
+                        <div class="player-row @(i < 3 ? "is-top-three" : "")">
+                            <div class="rank-section">
+                                <span class="rank-hash">#</span>@item.DisplayRank
+                            </div>
+                            <div class="team-logo">
+                                <img src="@item.TeamLogo" alt="team" />
+                            </div>
+                            <div class="name-section">
+                                <div class="player-full-name">@item.Name.ToUpper()</div>
+                            </div>
+                            <div class="value-section">
+                                @((int)item.Value)
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @* Columna Derecha *@
+                <div class="top-photos-column">
+                    @foreach (var top in Leaders.Take(3))
+                    {
+                        <div class="photo-box">
+                            <img src="@top.Photo" onerror="this.src='/images/default-player.png'" />
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </DialogContent>
+</MudDialog>
+
+<style>
+    /* Usamos el color Primary del tema */
+    .leader-dialog-container {
+        background-color: var(--mud-palette-primary) !important;
+        max-width: 850px;
+        --row-height: 46px;
+        --total-list-height: calc(var(--row-height) * 10 + 18px);
+        border-radius: 12px !important;
+    }
+
+        /* Ajuste para que el botón de cerrar (X) sea blanco y visible */
+        .leader-dialog-container .mud-dialog-title .mud-icon-button {
+            color: white !important;
+        }
+
+    .leader-board-wrapper {
+        color: white;
+        font-family: 'Roboto Condensed', sans-serif;
+        padding: 5px;
+    }
+
+    .leader-header {
+        background-color: white;
+        color: var(--mud-palette-primary);
+        width: 140px;
+        text-align: center;
+        padding: 5px;
+        margin-bottom: 15px;
+        clip-path: polygon(0 0, 100% 0, 85% 100%, 0% 100%);
+        border-radius: 4px 0 0 4px;
+    }
+
+    .header-main {
+        font-size: 2.2rem;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    .header-sub {
+        background-color: #d32f2f;
+        color: white;
+        font-size: 0.75rem;
+        font-weight: bold;
+        padding: 1px 0;
+    }
+
+    .main-content-flex {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px; /* Un poco más de espacio entre columnas */
+    }
+
+    .players-list {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .player-row {
+        display: flex;
+        align-items: center;
+        /* Azul oscuro semitransparente para que se vea el fondo azul */
+        background-color: rgba(0, 0, 0, 0.25);
+        height: var(--row-height);
+        padding: 0 15px;
+        border-radius: 6px; /* Bordes redondeados en las filas */
+    }
+
+    .is-top-three {
+        background-color: #d32f2f; /* Rojo más vibrante */
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+    }
+
+    .rank-section {
+        width: 40px;
+        font-weight: 900;
+        font-size: 1.1rem;
+    }
+
+    .rank-hash {
+        font-size: 0.7rem;
+        opacity: 0.8;
+    }
+
+    /* Logo del equipo redondeado */
+    .team-logo img {
+        width: 30px;
+        height: 30px;
+        margin-right: 12px;
+        object-fit: contain;
+        background-color: rgba(255,255,255,0.1);
+        border-radius: 50%; /* Logo circular */
+        padding: 2px;
+    }
+
+    .name-section {
+        flex: 1;
+    }
+
+    .player-full-name {
+        font-weight: 700;
+        font-size: 0.95rem;
+        letter-spacing: 0.3px;
+    }
+
+    .value-section {
+        font-size: 1.6rem;
+        font-weight: 900;
+        width: 55px;
+        text-align: right;
+    }
+
+    /* Columna de Fotos */
+    .top-photos-column {
+        width: 260px;
+        height: var(--total-list-height);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    /* Fotos redondeadas */
+    .photo-box {
+        flex: 1;
+        overflow: hidden;
+        border-radius: 10px; /* Bordes redondeados suaves */
+        border: 2px solid rgba(255,255,255,0.2);
+    }
+
+        .photo-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+    /* Ajuste para el título del dialog para que el botón se vea bien */
+    .leader-dialog-container .mud-dialog-title {
+        padding: 12px 16px;
+        background-color: rgba(0,0,0,0.1); /* Sutil separación del encabezado */
+    }
+</style>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public List<LeaderDetailDTO> Leaders { get; set; }
+    [Parameter] public string CategoryCode { get; set; }
+
+    private void VerRankingCompleto()
+    {
+        // Mapeo especial: Si el código es "DB", en Stats.razor se llama "HBP"
+
+        string sortField = CategoryCode == "DB" ? "HBP" : CategoryCode;
+
+        // Navegamos a la página de estadísticas pasando el campo de orden
+        Navigation.NavigateTo($"/stats?sort={sortField}");
+
+        // Cerramos el diálogo
+        MudDialog.Close();
+    }
+}

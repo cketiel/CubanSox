@@ -1,0 +1,603 @@
+﻿@using CubanSox.Web.Models
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+   
+    <TitleContent>
+        <MudText Typo="Typo.h6">Marcador de Juego</MudText>
+    </TitleContent>
+
+    <DialogContent>
+        @if (loading)
+        {
+            <MudProgressLinear Color="Color.Info" Indeterminate="true" />
+        }
+        else
+        {
+            
+            
+            <MudPaper Elevation="4" Class="pa-4 mb-6" Style="background: linear-gradient(to right, #f8f9fa, #ffffff, #f8f9fa); border-radius: 12px;">
+                <div class="d-flex align-center justify-space-around">
+        
+                    
+                    <div class="d-flex align-center gap-4" style="flex: 1; justify-content: flex-end;">
+                        <div class="text-end">
+                            <MudText Typo="Typo.h5" Style="font-weight: 800; color: #333;">@(Game?.VisitorTeam?.Name)</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #888;">VISITANTE</MudText>
+                        </div>
+                        <MudAvatar Size="Size.Large" Elevation="4" Style="width: 65px; height: 65px; border: 2px solid white; background-color: #eee;">
+                            @if (!string.IsNullOrEmpty(Game?.VisitorTeam?.Logo))
+                            {
+                                <MudImage Src="@Game?.VisitorTeam?.Logo" ObjectFit="ObjectFit.Cover" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Shield" Color="Color.Default" Style="font-size: 2.5rem;" />
+                            }
+                        </MudAvatar>
+                    </div>
+
+                    
+                    <div class="d-flex align-center justify-center gap-6" style="flex: 1;">
+                        <MudText Typo="Typo.h2" Style="font-weight: 900; min-width: 80px; text-align: center; color: #222;">
+                            @GetScore(Game?.VisitorTeamId)
+                        </MudText>
+
+                        <div class="d-flex flex-column align-center">
+                            <div style="height: 30px; width: 2px; background-color: #ddd;"></div>
+                            <MudText Typo="Typo.button" Style="letter-spacing: 2px; font-weight: bold; color: #444;">FINAL</MudText>
+                            <div style="height: 30px; width: 2px; background-color: #ddd;"></div>
+                        </div>
+
+                        <MudText Typo="Typo.h2" Style="font-weight: 900; min-width: 80px; text-align: center; color: #222;">
+                            @GetScore(Game?.HomeTeamId)
+                        </MudText>
+                    </div>
+
+                   
+                    <div class="d-flex align-center gap-4" style="flex: 1; justify-content: flex-start;">
+                        <MudAvatar Size="Size.Large" Elevation="4" Style="width: 65px; height: 65px; border: 2px solid white; background-color: #eee;">
+                            @if (!string.IsNullOrEmpty(Game?.HomeTeam?.Logo))
+                            {
+                                <MudImage Src="@Game?.HomeTeam?.Logo" ObjectFit="ObjectFit.Cover" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Shield" Color="Color.Default" Style="font-size: 2.5rem;" />
+                            }
+                        </MudAvatar>
+                        <div class="text-start">
+                            <MudText Typo="Typo.h5" Style="font-weight: 800; color: #333;">@(Game?.HomeTeam?.Name)</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #888;">HOME CLUB</MudText>
+                        </div>
+                    </div>
+                </div>
+            </MudPaper>
+
+            
+            <div style="overflow-x: auto; width: 100%;" class="mt-4">
+                <table class="mud-table mud-table-dense border rounded">
+                    <thead>
+                        <tr style="background-color: #fcfcfc;">
+                            <th class="mud-table-cell pa-2" style="min-width: 150px;">EQUIPO</th>
+                            @for (int i = 1; i <= inningCount; i++)
+                            {
+                                var inningNumber = i;
+                                <th class="mud-table-cell pa-2" style="text-align: center; width: 40px; color: #666;">@inningNumber</th>
+                            }
+                            <th class="mud-table-cell pa-2" style="text-align: center; width: 50px; background-color: #f0f0f0;">R</th>
+                            <th class="mud-table-cell pa-2" style="text-align: center; width: 50px;">H</th>
+                            <th class="mud-table-cell pa-2" style="text-align: center; width: 50px;">E</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var bs in boxScores)
+                        {
+                            <tr>
+                                <td class="mud-table-cell pa-2"><b>@bs.Team?.Name</b></td>
+                                @foreach (var inning in bs.Innings.OrderBy(x => x.InningNumber))
+                                {
+                                    <td class="mud-table-cell pa-1" style="text-align: center;">
+                                        <input type="number"
+                                               value="@inning.Runs"
+                                               @oninput="@((e) => OnInningChanged(bs, inning, e))"
+                                               style="width: 38px; text-align: center; border: 1px solid #ddd; border-radius: 4px; padding: 4px;" />
+                                    </td>
+                                }
+                                <td class="mud-table-cell pa-2" style="text-align: center; background-color: #f0f0f0;"><b>@bs.R</b></td>
+                                <td class="mud-table-cell pa-1"><input type="number" @bind="bs.H" style="width: 45px; text-align: center; border: 1px solid #eee;" /></td>
+                                <td class="mud-table-cell pa-1"><input type="number" @bind="bs.E" style="width: 45px; text-align: center; border: 1px solid #eee;" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4">
+                <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AddInning" Size="Size.Small" Variant="Variant.Outlined">Extra-Inning</MudButton>
+            </div>
+
+            <MudDivider Class="my-8" />
+
+
+            <MudGrid Spacing="1">
+                @foreach (var teamId in new[] { Game.VisitorTeamId, Game.HomeTeamId })
+                {
+                    var teamName = teamId == Game.VisitorTeamId ? Game.VisitorTeam?.Name : Game.HomeTeam?.Name;
+                    var stats = battingStats.Where(s => s.TempTeamId == teamId).OrderBy(s => s.Order).ToList();
+
+                    <MudItem xs="12">
+                        <MudPaper Elevation="2" Class="pa-2 mb-4">
+                            <div class="d-flex align-center justify-space-between mb-2 pa-2" style="background-color: #f1f3f4; border-radius: 4px;">
+                                <MudText Typo="Typo.subtitle2"><b>@teamName - BATEADORES</b></MudText>
+                                <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => AddPlayerRow(teamId))">Añadir Bateador</MudButton>
+                            </div>
+
+                            <div style="overflow-x: auto;">
+                                <table class="boxscore-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-start" style="min-width: 180px;">JUGADOR</th>
+                                            <th>POS</th>
+                                            <th>ORD</th>
+                                            <th>VB</th>
+                                            <th>H</th>
+                                            <th>2B</th>
+                                            <th>3B</th>
+                                            <th>HR</th>
+                                            <th>BB</th>
+                                            <th>K</th>
+                                            <th>CA</th>
+                                            <th>CI</th>
+                                            <th>BR</th>
+                                            <th>DB</th>
+                                            <th>SF</th>
+                                            <th>E</th>
+                                            <th style="background-color: #f9f9f9;">AVG</th>
+                                            <th style="background-color: #f9f9f9;">SLG</th>
+                                            <th style="background-color: #f9f9f9;">OBP</th>
+                                            <th style="background-color: #f9f9f9;">OPS</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var stat in stats)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <MudSelect T="int" Value="stat.PlayerId" ValueChanged="@((id) => OnPlayerSelected(stat, id))"
+                                                               Margin="Margin.Dense" Variant="Variant.Text" Dense="true" Style="font-size: 12px; font-weight: bold; margin-top: 0;">
+                                                        <MudSelectItem Value="0">Seleccionar...</MudSelectItem>
+                                                        @foreach (var p in teamPlayers.Where(p => p.TeamId == teamId))
+                                                        {
+                                                            <MudSelectItem Value="@p.Id">@p.Name</MudSelectItem>
+                                                        }
+                                                    </MudSelect>
+                                                </td>
+                                                <td><input type="text" @bind="stat.Position" class="in-text" /></td>
+                                                <td><input type="number" @bind="stat.Order" class="in-num" /></td>
+                                                <td><input type="number" @bind="stat.AB" class="in-num bold" /></td>
+                                                @* Columna H *@
+                                                <td>
+                                                    <input type="number" value="@stat.H"
+                                                           @oninput="@((e) => OnHitStatChanged(stat, "H", e))"
+                                                           class="in-num bold" />
+                                                </td>
+
+                                                @* Columna 2B *@
+                                                <td>
+                                                    <input type="number" value="@stat.Doubles"
+                                                           @oninput="@((e) => OnHitStatChanged(stat, "2B", e))"
+                                                           class="in-num" />
+                                                </td>
+
+                                                @* Columna 3B *@
+                                                <td>
+                                                    <input type="number" value="@stat.Triples"
+                                                           @oninput="@((e) => OnHitStatChanged(stat, "3B", e))"
+                                                           class="in-num" />
+                                                </td>
+
+                                                @* Columna HR *@
+                                                <td>
+                                                    <input type="number" value="@stat.HR"
+                                                           @oninput="@((e) => OnHitStatChanged(stat, "HR", e))"
+                                                           class="in-num" />
+                                                </td>
+                                                <td><input type="number" @bind="stat.BB" class="in-num" /></td>
+                                                <td><input type="number" @bind="stat.SO" class="in-num" /></td>
+                                                <td><input type="number" @bind="stat.R" class="in-num" /></td>
+                                                <td><input type="number" @bind="stat.RBI" class="in-num" /></td>
+                                                <td><input type="number" @bind="stat.SB" class="in-num" /></td>
+                                                <td><input type="number" @bind="stat.HBP" class="in-num" /></td>
+                                                <td><input type="number" @bind="stat.SF" class="in-num" /></td>
+                                                <td>
+                                                    <input type="number"
+                                                           value="@stat.E"
+                                                           @oninput="@((e) => OnPlayerErrorChanged(stat, e))"
+                                                           class="in-num" style="color: red;" />
+                                                </td>
+                                                <td class="res-cell">@((int)stat.AVG)</td>
+                                                <td class="res-cell">@((int)stat.SLG)</td>
+                                                <td class="res-cell">@((int)stat.OBP)</td>
+                                                <td class="res-cell">@((int)stat.OPS)</td>
+                                                <td>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => battingStats.Remove(stat))" />
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="totals-row">
+                                            <td colspan="3">TOTALES</td>
+                                            <td>@stats.Sum(s => s.AB)</td>
+                                            <td>@stats.Sum(s => s.H)</td>
+                                            <td>@stats.Sum(s => s.Doubles)</td>
+                                            <td>@stats.Sum(s => s.Triples)</td>
+                                            <td>@stats.Sum(s => s.HR)</td>
+                                            <td>@stats.Sum(s => s.BB)</td>
+                                            <td>@stats.Sum(s => s.SO)</td>
+                                            <td>@stats.Sum(s => s.R)</td>
+                                            <td>@stats.Sum(s => s.RBI)</td>
+                                            <td>@stats.Sum(s => s.SB)</td>
+                                            <td>@stats.Sum(s => s.HBP)</td>
+                                            <td>@stats.Sum(s => s.SF)</td>
+                                            <td>@stats.Sum(s => s.E)</td>
+                                            <td colspan="3"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </MudPaper>
+                    </MudItem>
+                }
+            </MudGrid>
+
+            <style>
+                .boxscore-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-family: 'Roboto Condensed', sans-serif;
+                }
+
+                    .boxscore-table th {
+                        font-size: 11px;
+                        color: #777;
+                        padding: 4px;
+                        border-bottom: 2px solid #eee;
+                        text-align: center;
+                    }
+
+                    .boxscore-table td {
+                        border-bottom: 1px solid #f0f0f0;
+                        padding: 2px;
+                        text-align: center;
+                    }
+
+                .in-num {
+                    width: 35px;
+                    border: 1px solid #ddd;
+                    text-align: center;
+                    font-size: 13px;
+                    border-radius: 3px;
+                }
+
+                .in-text {
+                    width: 40px;
+                    border: none;
+                    text-align: center;
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    color: #555;
+                }
+
+                .bold {
+                    font-weight: bold;
+                }
+
+                .res-cell {
+                    font-size: 12px;
+                    font-weight: 800;
+                    background-color: #f9f9f9;
+                    width: 45px;
+                }
+
+                .totals-row {
+                    background-color: #eee;
+                    font-weight: bold;
+                    font-size: 13px;
+                }
+
+                    .totals-row td {
+                        padding: 6px 2px;
+                    }
+            </style>
+
+           
+
+
+
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cerrar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">Guardar Resultado</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Game Game { get; set; } = default!;
+
+    private List<BoxScore> boxScores = new();
+    private int inningCount = 9;
+    private bool loading = true;
+
+    private List<BattingStat> battingStats = new();
+    private List<Player> teamPlayers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBoxScores();
+        await LoadTeamPlayers();
+        await LoadBattingStats();
+    }
+
+    private void OnHitStatChanged(BattingStat stat, string field, ChangeEventArgs e)
+    {
+        // 1. Obtener el nuevo valor del input
+        int.TryParse(e.Value?.ToString(), out int newVal);
+
+        // 2. Asignar el valor al campo correspondiente
+        switch (field)
+        {
+            case "H": stat.H = newVal; break;
+            case "2B": stat.Doubles = newVal; break;
+            case "3B": stat.Triples = newVal; break;
+            case "HR": stat.HR = newVal; break;
+        }
+
+        // 3. Buscar el BoxScore del equipo
+        var bs = boxScores.FirstOrDefault(x => x.TeamId == stat.TempTeamId);
+
+        if (bs != null)
+        {
+            // 4. Calcular el total de H para el Boxscore:
+            // Suma de (H + 2B + 3B + HR) de todos los jugadores de este equipo
+            bs.H = battingStats
+                    .Where(s => s.TempTeamId == stat.TempTeamId)
+                    .Sum(s => (s.H + s.Doubles + s.Triples + s.HR));
+        }
+
+        StateHasChanged();
+    }
+
+    private void OnPlayerErrorChanged(BattingStat stat, ChangeEventArgs e)
+    {
+        // 1. Actualizar el valor en la estadística del jugador
+        if (int.TryParse(e.Value?.ToString(), out int newVal))
+        {
+            stat.E = newVal;
+        }
+        else
+        {
+            stat.E = 0;
+        }
+
+        // 2. Buscar el BoxScore que corresponde al equipo de este jugador
+        var bs = boxScores.FirstOrDefault(x => x.TeamId == stat.TempTeamId);
+
+        if (bs != null)
+        {
+            // 3. Sumar todos los errores de los jugadores de ese equipo
+            bs.E = battingStats
+                    .Where(s => s.TempTeamId == stat.TempTeamId)
+                    .Sum(s => s.E);
+        }
+
+        StateHasChanged(); // Forzar actualización de la UI
+    }
+
+    private void OnPlayerSelected(BattingStat stat, int playerId)
+    {
+        stat.PlayerId = playerId;
+        var player = teamPlayers.FirstOrDefault(p => p.Id == playerId);
+        stat.Player = player;
+        StateHasChanged();
+    }
+
+    private async Task LoadTeamPlayers()
+    {
+        // Cargamos todos los jugadores de ambos equipos para el selector
+        var p1 = await Http.GetFromJsonAsync<List<Player>>($"api/Players/team/{Game.HomeTeamId}");
+        var p2 = await Http.GetFromJsonAsync<List<Player>>($"api/Players/team/{Game.VisitorTeamId}");
+        if (p1 != null) teamPlayers.AddRange(p1);
+        if (p2 != null) teamPlayers.AddRange(p2);
+    }
+
+    private async Task LoadBattingStats()
+    {
+        var existing = await Http.GetFromJsonAsync<List<BattingStat>>($"api/BattingStats/game/{Game.Id}");
+        if (existing != null)
+        {
+            foreach (var s in existing)
+            {
+                // Buscamos el equipo del jugador para saber en qué columna ponerlo
+                var p = teamPlayers.FirstOrDefault(player => player.Id == s.PlayerId);
+                s.TempTeamId = p?.TeamId ?? 0;
+            }
+            battingStats = existing;
+        }
+    }
+
+    private void AddPlayerRow(int teamId)
+    {
+        battingStats.Add(new BattingStat
+        {
+            GameId = Game.Id,
+            TempTeamId = teamId, // <--- Ahora la fila sabe a qué columna pertenece
+            Position = "DH",
+            Order = battingStats.Count(s => s.TempTeamId == teamId) + 1
+        });
+
+        StateHasChanged(); // Forzar a Blazor a redibujar
+    }
+
+    private int GetScore(int? teamId)
+    {
+        if (teamId == null || boxScores == null) return 0;
+        return boxScores.FirstOrDefault(b => b.TeamId == teamId)?.R ?? 0;
+    }
+
+    private async Task LoadBoxScores()
+    {
+        loading = true;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<List<BoxScore>>($"api/BoxScores/game/{Game.Id}");
+
+            if (response != null && response.Count >= 2)
+            {
+                boxScores = response.OrderBy(b => b.TeamId == Game.HomeTeamId ? 1 : 0).ToList();
+                inningCount = boxScores.Max(b => b.Innings.Count);
+                if (inningCount < 9) inningCount = 9;
+            }
+            else
+            {
+                boxScores = new List<BoxScore>();
+                boxScores.Add(new BoxScore { GameId = Game.Id, TeamId = Game.VisitorTeamId, Team = Game.VisitorTeam, Innings = CreateInnings(9) });
+                boxScores.Add(new BoxScore { GameId = Game.Id, TeamId = Game.HomeTeamId, Team = Game.HomeTeam, Innings = CreateInnings(9) });
+            }
+            CalculateTotals();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { loading = false; StateHasChanged(); }
+    }
+
+    private List<InningScore> CreateInnings(int count)
+    {
+        var list = new List<InningScore>();
+        for (int i = 1; i <= count; i++)
+        {
+            list.Add(new InningScore { InningNumber = i, Runs = 0 });
+        }
+        return list;
+    }
+
+    private void CalculateTotals()
+    {
+        foreach (var bs in boxScores)
+        {
+            bs.R = bs.Innings.Sum(i => i.Runs);
+
+            // Totales de Hits (H) - Suma de H, 2B, 3B, HR de los jugadores
+            var teamHits = battingStats
+                            .Where(s => s.TempTeamId == bs.TeamId)
+                            .Sum(s => (s.H + s.Doubles + s.Triples + s.HR));
+
+            if (teamHits > 0) bs.H = teamHits;
+
+            // Sumar Errores desde las estadísticas de bateo si ya existen
+            var teamErrors = battingStats.Where(s => s.TempTeamId == bs.TeamId).Sum(s => s.E);
+            if (teamErrors > 0) bs.E = teamErrors;
+        }
+    }
+
+    private void OnInningChanged(BoxScore bs, InningScore inning, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int result))
+            inning.Runs = result;
+        else
+            inning.Runs = 0;
+
+        bs.R = bs.Innings.Sum(i => i.Runs);
+        StateHasChanged(); // Ahora esto actualizará la pizarra porque está dentro de DialogContent
+    }
+
+    private void AddInning()
+    {
+        inningCount++;
+        foreach (var bs in boxScores)
+            bs.Innings.Add(new InningScore { InningNumber = inningCount, Runs = 0 });
+        StateHasChanged();
+    }
+
+    private async Task Save()
+    {
+        try
+        {
+            // 1. GUARDAR BOXSCORES (Entradas del juego)
+            foreach (var bs in boxScores)
+            {
+                var tempTeam = bs.Team;
+                bs.Team = null;
+                bs.Game = null;
+                await Http.PostAsJsonAsync("api/BoxScores", bs);
+                bs.Team = tempTeam;
+            }
+
+            // 2. GUARDAR BATTING STATS (Estadísticas individuales)
+            bool battingError = false;
+            foreach (var stat in battingStats)
+            {
+                // Solo intentamos guardar si tiene un jugador seleccionado y ha tenido VB (AB)
+                if (stat.PlayerId == 0) continue;
+
+                // LIMPIEZA VITAL: Ponemos a null los objetos para que JSON no se rompa
+                var tempPlayer = stat.Player;
+                stat.Player = null;
+
+                var response = await Http.PostAsJsonAsync("api/BattingStats", stat);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    battingError = true;
+                    var errorBody = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Error en {stat.PlayerId}: {errorBody}", Severity.Error);
+                    var errorMsg = await response.Content.ReadAsStringAsync();
+                    //Console.WriteLine($"Error en Jugador ID {stat.PlayerId}: {errorMsg}");
+                }
+
+                stat.Player = tempPlayer; // Restauramos para que no desaparezca el nombre en la UI
+            }
+
+            if (battingError)
+            {
+                Snackbar.Add("Se guardaron los resultados, pero hubo errores en algunos jugadores. Revisa la consola.", Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add("Todo se guardó correctamente", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Error crítico: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task SaveOld()
+    {
+        try
+        {
+            foreach (var bs in boxScores)
+            {
+                var tempTeam = bs.Team;
+                var tempGame = bs.Game;
+                bs.Team = null;
+                bs.Game = null;
+                await Http.PostAsJsonAsync("api/BoxScores", bs);
+                bs.Team = tempTeam;
+                bs.Game = tempGame;
+            }
+            Snackbar.Add("Resultado guardado", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

@@ -1,0 +1,282 @@
+﻿@page "/stats"
+@using CubanSox.Web.Models
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-8">
+    <MudText Typo="Typo.h4" GutterBottom="true" Style="font-weight: 900; color: #1a237e;">ESTADÍSTICAS DEL CAMPEONATO</MudText>
+    <MudText Typo="Typo.subtitle1" Class="mb-6">Ranking oficial basado en el rendimiento individual de los jugadores</MudText>
+
+    @if (loading)
+    {
+        <MudProgressLinear Color="Color.Info" Indeterminate="true" />
+    }
+    else
+    {
+        <MudPaper Elevation="4" Style="border-radius: 12px; overflow: hidden;">
+            <div style="overflow-x: auto;">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th class="text-start">JUGADOR</th>
+                            <th @onclick='() => Sort("AB")' class="sortable">VB</th>
+                            <th @onclick='() => Sort("H")' class="sortable">H</th>
+                            <th @onclick='() => Sort("Doubles")' class="sortable">2B</th>
+                            <th @onclick='() => Sort("Triples")' class="sortable">3B</th>
+                            <th @onclick='() => Sort("HR")' class="sortable">HR</th>
+                            <th @onclick='() => Sort("BB")' class="sortable">BB</th>
+                            <th @onclick='() => Sort("SO")' class="sortable">K</th>
+                            <th @onclick='() => Sort("R")' class="sortable">CA</th>
+                            <th @onclick='() => Sort("RBI")' class="sortable">CI</th>
+                            <th @onclick='() => Sort("SB")' class="sortable">BR</th>
+                            <th @onclick='() => Sort("HBP")' class="sortable">DB</th>
+                            <th @onclick='() => Sort("SF")' class="sortable">SF</th>
+                            <th @onclick='() => Sort("E")' class="sortable">E</th>
+                            <th @onclick='() => Sort("AVG")' class="sortable highlight">AVG</th>
+                            <th @onclick='() => Sort("SLG")' class="sortable highlight">SLG</th>
+                            <th @onclick='() => Sort("OBP")' class="sortable highlight">OBP</th>
+                            <th @onclick='() => Sort("OPS")' class="sortable highlight">OPS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < playerSummaries.Count; i++)
+                        {
+                            var s = playerSummaries[i];
+                            <tr>
+                                <td class="rank-cell">@(i + 1)</td>
+                                <td class="text-start player-name">@s.PlayerFullName</td>
+                                <td>@s.TotalAB</td>
+                                <td>@s.TotalH</td>
+                                <td>@s.TotalDoubles</td>
+                                <td>@s.TotalTriples</td>
+                                <td>@s.TotalHR</td>
+                                <td>@s.TotalBB</td>
+                                <td>@s.TotalSO</td>
+                                <td>@s.TotalR</td>
+                                <td>@s.TotalRBI</td>
+                                <td>@s.TotalSB</td>
+                                <td>@s.TotalHBP</td>
+                                <td>@s.TotalSF</td>
+                                <td style="color: #d32f2f;">@s.TotalE</td>
+                                <td class="calc-cell">@s.AVG.ToString("0")</td>
+                                <td class="calc-cell">@s.SLG.ToString("0")</td>
+                                <td class="calc-cell">@s.OBP.ToString("0")</td>
+                                <td class="calc-cell">@s.OPS.ToString("0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </MudPaper>
+    }
+</MudContainer>
+
+<style>
+    .stats-table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: white;
+        font-family: 'Roboto Condensed', sans-serif;
+    }
+
+        .stats-table thead th {
+            background-color: #1a237e;
+            color: white;
+            padding: 12px 8px;
+            font-size: 11px;
+            text-transform: uppercase;
+            cursor: pointer;
+            user-select: none;
+        }
+
+            .stats-table thead th:hover {
+                background-color: #303f9f;
+            }
+
+        .stats-table tbody tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .stats-table tbody tr:hover {
+            background-color: #eeeeee;
+        }
+
+        .stats-table td {
+            padding: 10px 8px;
+            text-align: center;
+            font-size: 13px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+    .player-name {
+        font-weight: bold;
+        color: #333;
+        min-width: 200px;
+    }
+
+    .rank-cell {
+        background-color: #f1f3f4;
+        font-weight: 900;
+        color: #555;
+    }
+
+    .calc-cell {
+        font-weight: bold;
+        background-color: #fffde7;
+        color: #000;
+    }
+
+    .sortable::after {
+        content: ' ↕';
+        font-size: 8px;
+        opacity: 0.5;
+    }
+
+    .highlight {
+        background-color: #283593 !important;
+    }
+</style>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? sort { get; set; }
+
+    private bool loading = true;
+    private List<PlayerSummary> playerSummaries = new();
+    private string currentSortField = "AVG";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        if (!string.IsNullOrEmpty(sort))
+        {
+            Sort(sort);
+        }
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        try
+        {
+            // Cargamos todos los jugadores y todas las estadísticas de bateo
+            var players = await Http.GetFromJsonAsync<List<Player>>("api/Players");
+            var allStats = await Http.GetFromJsonAsync<List<BattingStat>>("api/BattingStats");
+
+            if (players != null && allStats != null)
+            {
+                // Agrupamos por Jugador y calculamos sumatorias
+                playerSummaries = allStats
+                    .GroupBy(s => s.PlayerId)
+                    .Select(g =>
+                    {
+                        var p = players.FirstOrDefault(x => x.Id == g.Key);
+                        var summary = new PlayerSummary
+                        {
+                            PlayerFullName = p?.Name ?? "Desconocido",
+                            TotalAB = g.Sum(x => x.AB),
+                            TotalH = g.Sum(x => x.H),
+                            TotalDoubles = g.Sum(x => x.Doubles),
+                            TotalTriples = g.Sum(x => x.Triples),
+                            TotalHR = g.Sum(x => x.HR),
+                            TotalBB = g.Sum(x => x.BB),
+                            TotalSO = g.Sum(x => x.SO),
+                            TotalR = g.Sum(x => x.R),
+                            TotalRBI = g.Sum(x => x.RBI),
+                            TotalSB = g.Sum(x => x.SB),
+                            TotalHBP = g.Sum(x => x.HBP),
+                            TotalSF = g.Sum(x => x.SF),
+                            TotalE = g.Sum(x => x.E)
+                        };
+                        summary.CalculateRates(); // Calcular AVG, SLG, OBP, OPS
+                        return summary;
+                    }).ToList();
+
+                Sort("AVG"); // Orden inicial
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Error al cargar estadísticas: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void Sort(string field)
+    {
+        currentSortField = field;
+        playerSummaries = field switch
+        {
+            "AB" => playerSummaries.OrderByDescending(x => x.TotalAB).ToList(),
+            "H" => playerSummaries.OrderByDescending(x => x.TotalH).ToList(),
+            "Doubles" => playerSummaries.OrderByDescending(x => x.TotalDoubles).ToList(),
+            "Triples" => playerSummaries.OrderByDescending(x => x.TotalTriples).ToList(),
+            "HR" => playerSummaries.OrderByDescending(x => x.TotalHR).ToList(),
+            "BB" => playerSummaries.OrderByDescending(x => x.TotalBB).ToList(),
+            "SO" => playerSummaries.OrderByDescending(x => x.TotalSO).ToList(),
+            "R" => playerSummaries.OrderByDescending(x => x.TotalR).ToList(),
+            "RBI" => playerSummaries.OrderByDescending(x => x.TotalRBI).ToList(),
+            "SB" => playerSummaries.OrderByDescending(x => x.TotalSB).ToList(),
+            "HBP" => playerSummaries.OrderByDescending(x => x.TotalHBP).ToList(),
+            "SF" => playerSummaries.OrderByDescending(x => x.TotalSF).ToList(),
+            "E" => playerSummaries.OrderByDescending(x => x.TotalE).ToList(),
+            "AVG" => playerSummaries.OrderByDescending(x => x.AVG).ToList(),
+            "SLG" => playerSummaries.OrderByDescending(x => x.SLG).ToList(),
+            "OBP" => playerSummaries.OrderByDescending(x => x.OBP).ToList(),
+            "OPS" => playerSummaries.OrderByDescending(x => x.OPS).ToList(),
+            _ => playerSummaries
+        };
+        StateHasChanged();
+    }
+
+    // Clase auxiliar para los cálculos
+    public class PlayerSummary
+    {
+        public string PlayerFullName { get; set; } = "";
+        public int TotalAB { get; set; }
+        public int TotalH { get; set; }
+        public int TotalDoubles { get; set; }
+        public int TotalTriples { get; set; }
+        public int TotalHR { get; set; }
+        public int TotalBB { get; set; }
+        public int TotalSO { get; set; }
+        public int TotalR { get; set; }
+        public int TotalRBI { get; set; }
+        public int TotalSB { get; set; }
+        public int TotalHBP { get; set; }
+        public int TotalSF { get; set; }
+        public int TotalE { get; set; }
+
+        public double AVG { get; private set; }
+        public double SLG { get; private set; }
+        public double OBP { get; private set; }
+        public double OPS { get; private set; }
+
+        public void CalculateRates()
+        {
+            // Numerador común para Hits Totales (H + 2B + 3B + HR)
+            double totalHits = TotalH + TotalDoubles + TotalTriples + TotalHR;
+
+            // AVG = (Total Hits) / AB * 1000
+            AVG = TotalAB > 0 ? (totalHits / TotalAB) * 1000 : 0;
+
+            // SLG = (H + 2*2B + 3*3B + 4*HR) / AB * 1000
+            double totalBases = TotalH + (2 * TotalDoubles) + (3 * TotalTriples) + (4 * TotalHR);
+            SLG = TotalAB > 0 ? (totalBases / TotalAB) * 1000 : 0;
+
+            // OBP = (Total Hits + BB + HBP) / (AB + BB + HBP + SF) * 1000
+            double obpNumerator = totalHits + TotalBB + TotalHBP;
+            double obpDenominator = TotalAB + TotalBB + TotalHBP + TotalSF;
+            OBP = obpDenominator > 0 ? (obpNumerator / obpDenominator) * 1000 : 0;
+
+            // OPS = OBP + SLG
+            OPS = OBP + SLG;
+        }
+    }
+}

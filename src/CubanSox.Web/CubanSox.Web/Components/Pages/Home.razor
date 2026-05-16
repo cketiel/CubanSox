@@ -1,0 +1,322 @@
+﻿@page "/"
+@using CubanSox.Web.Models
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@rendermode InteractiveServer
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-8 mb-8">
+    <MudGrid Spacing="4">
+        @if (loading)
+        {
+            <MudItem xs="12">
+                <MudProgressLinear Color="Color.Info" Indeterminate="true" />
+            </MudItem>
+        }
+        else
+        {
+            @* --- FILA 1 --- *@
+            <MudItem xs="12" md="4">
+                <MudCard Elevation="4" Style="height: 100%; border-top: 5px solid #1a237e;">
+                    <MudCardHeader>
+                        <CardHeaderContent><MudText Typo="Typo.h6">PRÓXIMO ENCUENTRO</MudText></CardHeaderContent>
+                        <CardHeaderActions><MudIcon Icon="@Icons.Material.Filled.Event" Color="Color.Primary" Class="mt-2 mr-2" /></CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (nextGame != null)
+                        {
+                            <div class="d-flex flex-column align-center">
+                                <div class="d-flex align-center justify-space-around w-100 mb-4">
+                                    <div class="text-center">
+                                        <MudAvatar Size="Size.Large" Elevation="2"><MudImage Src="@nextGame.VisitorTeam?.Logo" /></MudAvatar>
+                                        <MudText Typo="Typo.caption" Class="d-block mt-1">@nextGame.VisitorTeam?.Name</MudText>
+                                    </div>
+                                    <MudText Typo="Typo.h6" Style="font-weight: 900;">VS</MudText>
+                                    <div class="text-center">
+                                        <MudAvatar Size="Size.Large" Elevation="2"><MudImage Src="@nextGame.HomeTeam?.Logo" /></MudAvatar>
+                                        <MudText Typo="Typo.caption" Class="d-block mt-1">@nextGame.HomeTeam?.Name</MudText>
+                                    </div>
+                                </div>
+                                <MudDivider DividerType="DividerType.Middle" Class="w-100 my-2" />
+                                <MudText Typo="Typo.body1" Style="font-weight: bold;"><MudIcon Icon="@Icons.Material.Filled.Place" Size="Size.Small" /> @nextGame.Field</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Style="text-transform: capitalize;">
+                                    @nextGame.Date?.ToString("dddd, dd MMMM yyyy", new System.Globalization.CultureInfo("es-ES"))
+                                </MudText>
+                                <MudText Typo="Typo.h5" Style="font-weight: 800; color: #1a237e;">
+                                    @(nextGame.Time.HasValue ? DateTime.Today.Add(nextGame.Time.Value).ToString("hh:mm tt") : "--:--")
+                                </MudText>
+                            </div>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+           
+
+            @foreach (var category in categoryList)
+            {
+                var leader = leaders.ContainsKey(category.Key) ? leaders[category.Key] : null;
+
+                <MudItem xs="12" md="4">
+                    <MudCard Elevation="4"
+                             @onclick="@(async () => await OpenLeaderList(category.Key, category.Title))"
+                             Class="leader-card-hover"
+                             Style="@($"height: 100%; border-top: 5px solid {category.Color}; cursor: pointer;")">
+                        <MudCardHeader>
+                            <CardHeaderContent><MudText Typo="Typo.h6" Style="font-size: 1rem;">@category.Title</MudText></CardHeaderContent>
+                            <CardHeaderActions><MudIcon Icon="@category.Icon" Style="@($"color: {category.Color};")" Class="mt-2 mr-2" /></CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            @if (leader != null)
+                            {
+                                <div class="d-flex flex-column align-center">
+                                    <MudAvatar Style="width:70px; height:70px;" Elevation="4" Class="mb-3">
+                                        @if (!string.IsNullOrEmpty(leader.Photo))
+                                        {
+                                            <MudImage Src="@leader.Photo" />
+                                        }
+                                        else
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Person" Style="font-size: 2.5rem;" />
+                                        }
+                                    </MudAvatar>
+                                    <MudText Typo="Typo.body1" Align="Align.Center" Style="font-weight: 700;">@leader.FullName</MudText>
+                                    <MudText Typo="Typo.caption">@category.Label</MudText>
+                                    <MudText Typo="Typo.h4" Style="@($"font-weight: 900; color: {category.Color};")">@((int)leader.Value)</MudText>
+                                </div>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+            
+        }
+    </MudGrid>
+</MudContainer>
+<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Console.WriteLine("¡Botón funciona!"))">
+    PROBAR INTERACTIVIDAD
+</MudButton>
+<style>
+    .leader-card-hover {
+        transition: all 0.3s ease-in-out;
+    }
+
+    .leader-card-hover:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 20px rgba(0,0,0,0.2) !important;
+    }
+
+    .leader-dialog-overlay {
+        backdrop-filter: blur(4px);
+        background-color: rgba(0,0,0,0.7) !important;
+    }
+</style>
+
+@code {
+    private bool loading = true;
+    private Game? nextGame;
+    private Dictionary<string, LeaderDTO?> leaders = new();
+
+    // VARIABLES GLOBALES PARA PERSISTENCIA (Esto evita errores de compilación)
+    private List<Player> allPlayers = new();
+    private List<Team> allTeams = new();
+    private List<PlayerStatSummary> allPlayerStats = new();
+
+    
+
+    
+
+    private async Task OpenLeaderList(string key, string title)
+    {
+        Console.WriteLine($"Abriendo líder: {title}");
+        var sortedList = allPlayerStats
+            .OrderByDescending(x => GetValueByField(x, key))
+            .Take(10)
+            .ToList();
+
+        var leadersToDisplay = new List<LeaderDetailDTO>();
+        double lastValue = -1;
+        int actualRank = 1;
+
+        for (int i = 0; i < sortedList.Count; i++)
+        {
+            var current = sortedList[i];
+            double currentValue = GetValueByField(current, key);
+
+            if (i > 0 && currentValue == lastValue) { /* mantiene rank */ }
+            else { actualRank = i + 1; }
+
+            var p = allPlayers.FirstOrDefault(x => x.Id == current.PlayerId);
+            var t = allTeams.FirstOrDefault(x => x.Id == p?.TeamId);
+
+            leadersToDisplay.Add(new LeaderDetailDTO
+            {
+                DisplayRank = actualRank,
+                Name = p?.Name ?? "---",
+                Photo = p?.Photo,
+                TeamLogo = t?.Logo,
+                Value = currentValue
+            });
+            lastValue = currentValue;
+        }
+
+        //var parameters = new DialogParameters { ["Leaders"] = leadersToDisplay, ["CategoryCode"] = key };
+        //var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var parameters = new DialogParameters();
+        parameters.Add("Leaders", leadersToDisplay);
+        parameters.Add("CategoryCode", key);
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            
+            BackgroundClass = "leader-dialog-overlay"
+        };
+        await DialogService.ShowAsync<LeaderListDialog>(title, parameters, options);
+    }
+
+    private double GetValueByField(PlayerStatSummary stat, string key)
+    {
+        return key switch
+        {
+            "AVG" => stat.AVG,
+            "HR" => stat.HR,
+            "SLG" => stat.SLG,
+            "OBP" => stat.OBP,
+            "OPS" => stat.OPS,
+            "H" => stat.TotalHits,
+            "2B" => stat.D2B,
+            "3B" => stat.T3B,
+            "SO" => stat.SO,
+            "R" => stat.R,
+            "RBI" => stat.RBI,
+            "BB" => stat.BB,
+            "BR" => stat.SB,
+            "SF" => stat.SF,
+            "DB" => stat.HBP,
+            "E" => stat.E,
+            _ => 0
+        };
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        string[] keys = { "AVG", "HR", "SLG", "OBP", "OPS", "H", "2B", "3B", "SO", "R", "RBI", "BB", "BR", "SF", "DB", "E" };
+        foreach (var key in keys) leaders[key] = null;
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        loading = true;
+        try
+        {
+            var games = await Http.GetFromJsonAsync<List<Game>>("api/Games");
+            if (games != null) nextGame = games.OrderByDescending(g => g.Date).FirstOrDefault();
+
+            allPlayers = await Http.GetFromJsonAsync<List<Player>>("api/Players") ?? new();
+            allTeams = await Http.GetFromJsonAsync<List<Team>>("api/Teams") ?? new();
+            var stats = await Http.GetFromJsonAsync<List<BattingStat>>("api/BattingStats") ?? new();
+
+            CalculateAllLeaders(allPlayers, stats);
+        }
+        catch (Exception ex) { Snackbar.Add("Error: " + ex.Message, Severity.Error); }
+        finally { loading = false; }
+    }
+
+    private void CalculateAllLeaders(List<Player> players, List<BattingStat> stats)
+    {
+        allPlayerStats = stats.GroupBy(s => s.PlayerId).Select(g =>
+        {
+            int ab = g.Sum(x => x.AB);
+            int h = g.Sum(x => x.H);
+            int d2b = g.Sum(x => x.Doubles);
+            int t3b = g.Sum(x => x.Triples);
+            int hr = g.Sum(x => x.HR);
+            int bb = g.Sum(x => x.BB);
+            int hbp = g.Sum(x => x.HBP);
+            int sf = g.Sum(x => x.SF);
+            int totalHits = h + d2b + t3b + hr;
+
+            double slg = ab > 0 ? (double)(h + (2 * d2b) + (3 * t3b) + (4 * hr)) / ab * 1000 : 0;
+            double obp = (ab + bb + hbp + sf) > 0 ? (double)(totalHits + bb + hbp) / (ab + bb + hbp + sf) * 1000 : 0;
+
+            return new PlayerStatSummary
+            {
+                PlayerId = g.Key,
+                AB = ab,
+                TotalHits = totalHits,
+                HR = hr,
+                SLG = slg,
+                OBP = obp,
+                OPS = slg + obp,
+                D2B = d2b,
+                T3B = t3b,
+                SO = g.Sum(x => x.SO),
+                R = g.Sum(x => x.R),
+                RBI = g.Sum(x => x.RBI),
+                BB = bb,
+                SB = g.Sum(x => x.SB),
+                SF = sf,
+                HBP = hbp,
+                E = g.Sum(x => x.E)
+            };
+        }).ToList();
+
+        foreach (var key in leaders.Keys.ToList())
+        {
+            var top = allPlayerStats.OrderByDescending(x => GetValueByField(x, key)).FirstOrDefault();
+            if (top != null)
+            {
+                var p = allPlayers.FirstOrDefault(x => x.Id == top.PlayerId);
+                leaders[key] = new LeaderDTO { Value = GetValueByField(top, key), FullName = p?.Name ?? "---", Photo = p?.Photo };
+            }
+        }
+    }
+
+    // CLASES DE APOYO (Para resolver errores de tipos)
+    public class PlayerStatSummary
+    {
+        public int PlayerId { get; set; }
+        public int AB { get; set; }
+        public int TotalHits { get; set; }
+        public int HR { get; set; }
+        public double SLG { get; set; }
+        public double OBP { get; set; }
+        public double OPS { get; set; }
+        public int D2B { get; set; }
+        public int T3B { get; set; }
+        public int SO { get; set; }
+        public int R { get; set; }
+        public int RBI { get; set; }
+        public int BB { get; set; }
+        public int SB { get; set; }
+        public int SF { get; set; }
+        public int HBP { get; set; }
+        public int E { get; set; }
+        public double AVG => AB > 0 ? (double)TotalHits / AB * 1000 : 0;
+    }
+
+    private List<(string Key, string Title, string Label, string Color, string Icon)> categoryList = new()
+{
+    ("AVG", "LÍDER DE BATEO", "PROMEDIO", "#2e7d32", Icons.Material.Filled.Star),
+    ("HR", "LÍDER DE JONRONES", "TOTAL HR", "#c62828", Icons.Material.Filled.Whatshot),
+    ("SLG", "LÍDER DE SLG", "SLUGGING", "#673ab7", Icons.Material.Filled.TrendingUp),
+    ("OBP", "LÍDER DE OBP", "ON-BASE %", "#00bcd4", Icons.Material.Filled.PieChart),
+    ("OPS", "LÍDER DE OPS", "OBP + SLG", "#ff9800", Icons.Material.Filled.AddCircle),
+    ("H", "LÍDER DE HITS", "TOTAL HITS", "#1976d2", Icons.Material.Filled.SportsBaseball),
+    ("2B", "LÍDER DE DOBLES", "TOTAL 2B", "#ed6c02", Icons.Material.Filled.Filter2),
+    ("3B", "LÍDER DE TRIPLES", "TOTAL 3B", "#9c27b0", Icons.Material.Filled.Filter3),
+    ("SO", "LÍDER DE PONCHES", "TOTAL K", "#424242", Icons.Material.Filled.Close),
+    ("R", "LÍDER DE ANOTADAS", "TOTAL CA", "#00897b", Icons.Material.Filled.DirectionsRun),
+    ("RBI", "LÍDER DE IMPULSADAS", "TOTAL CI", "#5d4037", Icons.Material.Filled.Groups),
+    ("BB", "LÍDER DE BOLETOS", "TOTAL BB", "#795548", Icons.Material.Filled.LocationOn),
+    ("BR", "LÍDER DE ROBADAS", "TOTAL BR", "#afb42b", Icons.Material.Filled.Speed),
+    ("SF", "LÍDER DE SACRIFICIO", "TOTAL SF", "#607d8b", Icons.Material.Filled.KeyboardDoubleArrowUp),
+    ("DB", "LÍDER DE DEAD BALL", "TOTAL HBP", "#d84315", Icons.Material.Filled.BackHand),
+    ("E", "LÍDER DE ERRORES", "TOTAL E", "#b71c1c", Icons.Material.Filled.ReportProblem)
+};
+    
+}
