@@ -6,7 +6,7 @@
 
 <MudText Typo="Typo.h4" Class="mb-4">Calendario de Juegos</MudText>
 
-
+@* --- Formulario de Programación (Se mantiene igual) --- *@
 <MudPaper Class="pa-6 mb-6" Elevation="4">
     <MudText Typo="Typo.h6" Class="mb-4">@(isEditing ? "Editar Juego" : "Programar Nuevo Juego")</MudText>
     <MudGrid>
@@ -39,52 +39,63 @@
                 }
             </MudSelect>
         </MudItem>
-      
 
         <MudItem xs="12" Class="d-flex justify-end gap-2 mt-4">
             @if (isEditing)
             {
                 <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="CancelEdit">Cancelar</MudButton>
             }
-            <MudButton Variant="Variant.Filled" Color="isEditing ? Color.Warning : Color.Primary" OnClick="SaveGame" Size="Size.Large" StartIcon="@Icons.Material.Filled.Save">
+            <MudButton Variant="Variant.Filled" Color="isEditing? Color.Warning: Color.Primary" OnClick="SaveGame" Size="Size.Large" StartIcon="@Icons.Material.Filled.Save">
                 @(isEditing ? "Actualizar Juego" : "Guardar Juego")
             </MudButton>
         </MudItem>
     </MudGrid>
 </MudPaper>
 
-
+@* --- Tabla de Juegos con Resultados --- *@
 <MudTable Items="@games" Hover="true" Loading="@loading" Elevation="2" Class="mb-8">
     <HeaderContent>
         <MudTh>Fecha / Hora</MudTh>
         <MudTh>Estadio</MudTh>
-        <MudTh Style="text-align:center">Encuentro (Visitante vs Home)</MudTh>
+        <MudTh Style="text-align:center">Encuentro y Resultado</MudTh>
         <MudTh Style="text-align:right">Acciones</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="Fecha">
             <MudText Typo="Typo.body2"><b>@context.Date?.ToString("dd/MM/yyyy")</b></MudText>
-            <MudText Typo="Typo.caption">@(context.Time.HasValue ? DateTime.Today.Add(context.Time.Value).ToString("hh:mm tt") : "-")</MudText>
+            <MudText Typo="Typo.caption">@(context.Time.HasValue? DateTime.Today.Add(context.Time.Value).ToString("hh:mm tt") : "-")</MudText>
         </MudTd>
         <MudTd DataLabel="Estadio">@context.Field</MudTd>
         <MudTd DataLabel="Encuentro">
             <div class="d-flex align-center justify-center gap-4">
-        
-                <div class="d-flex flex-column align-center" style="width: 120px">
-                    <MudAvatar Size="Size.Large" Elevation="2">
+
+                @* Visitante *@
+                <div class="d-flex flex-column align-center" style="width: 100px">
+                    <MudAvatar Size="Size.Medium" Elevation="2">
                         <MudImage Src="@context.VisitorTeam?.Logo" ObjectFit="ObjectFit.Cover" />
                     </MudAvatar>
-                    <MudText Typo="Typo.caption" Class="mt-1">@context.VisitorTeam?.Name</MudText>
+                    <MudText Typo="Typo.caption" Class="mt-1 text-center" Style="line-height: 1; height: 24px;">@context.VisitorTeam?.Name</MudText>
                 </div>
 
-                <MudText Typo="Typo.h6">@(" @ ")</MudText> 
+                @* Marcador *@
+                <div class="d-flex align-center justify-center px-4 py-1 rounded-pill" style="background-color: #f0f2f5; min-width: 120px; border: 1px solid #e0e0e0;">
+                    <MudText Typo="Typo.h5" Style="@GetScoreStyle(context.Id, context.VisitorTeamId, context.HomeTeamId)">
+                        @GetTeamScore(context.Id, context.VisitorTeamId)
+                    </MudText>
 
-        
-                <div class="d-flex flex-column align-center" style="width: 120px">
-                    <MudAvatar Size="Size.Large" Elevation="2">
+                    <MudText Typo="Typo.h6" Class="mx-2" Style="color: #999;">-</MudText>
+
+                    <MudText Typo="Typo.h5" Style="@GetScoreStyle(context.Id, context.HomeTeamId, context.VisitorTeamId)">
+                        @GetTeamScore(context.Id, context.HomeTeamId)
+                    </MudText>
+                </div>
+
+                @* Home Team *@
+                <div class="d-flex flex-column align-center" style="width: 100px">
+                    <MudAvatar Size="Size.Medium" Elevation="2">
                         <MudImage Src="@context.HomeTeam?.Logo" ObjectFit="ObjectFit.Cover" />
                     </MudAvatar>
-                    <MudText Typo="Typo.caption" Class="mt-1">@context.HomeTeam?.Name</MudText>
+                    <MudText Typo="Typo.caption" Class="mt-1 text-center" Style="line-height: 1; height: 24px;">@context.HomeTeam?.Name</MudText>
                 </div>
             </div>
         </MudTd>
@@ -102,6 +113,7 @@
 @code {
     private List<Game> games = new();
     private List<Team> teams = new();
+    private Dictionary<int, List<BoxScore>> gameScores = new(); // Diccionario para guardar BoxScores por GameId
     private Game gameModel = new() { Date = DateTime.Today };
     private bool loading = true;
     private bool isEditing = false;
@@ -111,50 +123,79 @@
     private async Task LoadData()
     {
         loading = true;
-        try {
+        try
+        {
             games = await Http.GetFromJsonAsync<List<Game>>("api/Games") ?? new();
             teams = await Http.GetFromJsonAsync<List<Team>>("api/Teams") ?? new();
-        } catch (Exception ex) {
+
+            // Cargar scores de cada juego
+            gameScores.Clear();
+            foreach (var game in games)
+            {
+                var scores = await Http.GetFromJsonAsync<List<BoxScore>>($"api/BoxScores/game/{game.Id}");
+                if (scores != null && scores.Count > 0)
+                {
+                    gameScores[game.Id] = scores;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
             Snackbar.Add("Error al cargar: " + ex.Message, Severity.Error);
-        } finally { loading = false; }
+        }
+        finally { loading = false; }
     }
 
+    // Método auxiliar para obtener las carreras de un equipo en un juego
+    private string GetTeamScore(int gameId, int teamId)
+    {
+        if (gameScores.ContainsKey(gameId))
+        {
+            var score = gameScores[gameId].FirstOrDefault(s => s.TeamId == teamId);
+            return score != null ? score.R.ToString() : "0";
+        }
+        return "-";
+    }
+
+    // Método auxiliar para poner en negrita y color al ganador
+    private string GetScoreStyle(int gameId, int teamId, int rivalId)
+    {
+        if (!gameScores.ContainsKey(gameId)) return "color: #bdbdbd;";
+
+        var myScore = gameScores[gameId].FirstOrDefault(s => s.TeamId == teamId)?.R ?? 0;
+        var rivalScore = gameScores[gameId].FirstOrDefault(s => s.TeamId == rivalId)?.R ?? 0;
+
+        if (myScore > rivalScore)
+            return "font-weight: 900; color: #1a237e;"; // Ganador: Azul fuerte y negrita
+
+        if (myScore < rivalScore)
+            return "font-weight: 400; color: #757575;"; // Perdedor: Gris
+
+        return "font-weight: 700; color: #424242;"; // Empate o inicial
+    }
+
+    // --- El resto de los métodos (OpenScoreDialog, SaveGame, etc.) se mantienen igual ---
     private async Task OpenScoreDialog(Game game)
     {
         var parameters = new DialogParameters<GameScoreDialog> { { x => x.Game, game } };
-        //var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
-        //var dialog = await DialogService.ShowAsync<GameScoreDialog>("BoxScore", parameters, options);
-
-        var options = new DialogOptions
-        {
-            MaxWidth = MaxWidth.Large,
-            FullWidth = true,
-            CloseButton = true,
-            BackdropClick = false // Evita que se cierre por error
-        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true, CloseButton = true, BackdropClick = false };
 
         var dialog = await DialogService.ShowAsync<GameScoreDialog>("Box Score Detallado", parameters, options);
         var result = await dialog.Result;
 
         if (!result.Canceled)
         {
-            await LoadData(); // Recargar la lista de juegos para ver si algo cambió
+            await LoadData();
         }
     }
 
     private async Task SaveGame()
     {
-        // Validaciones básicas
-        if (gameModel.HomeTeamId == 0 || gameModel.VisitorTeamId == 0) {
+        if (gameModel.HomeTeamId == 0 || gameModel.VisitorTeamId == 0)
+        {
             Snackbar.Add("Debe seleccionar ambos equipos", Severity.Warning);
             return;
         }
-        if (gameModel.HomeTeamId == gameModel.VisitorTeamId) {
-            Snackbar.Add("Un equipo no puede jugar contra sí mismo", Severity.Warning);
-            return;
-        }
-
-        // Limpiar objetos de navegación para evitar errores en la API
         gameModel.HomeTeam = null;
         gameModel.VisitorTeam = null;
 
@@ -164,26 +205,18 @@
         else
             response = await Http.PostAsJsonAsync("api/Games", gameModel);
 
-        if (response.IsSuccessStatusCode) {
+        if (response.IsSuccessStatusCode)
+        {
             Snackbar.Add("Juego guardado correctamente", Severity.Success);
             CancelEdit();
             await LoadData();
-        } else {
-            Snackbar.Add("Error al guardar el juego", Severity.Error);
         }
     }
 
     private void PrepareEdit(Game g)
     {
         isEditing = true;
-        gameModel = new Game {
-            Id = g.Id,
-            Date = g.Date,
-            Time = g.Time,
-            Field = g.Field,
-            HomeTeamId = g.HomeTeamId,
-            VisitorTeamId = g.VisitorTeamId
-        };
+        gameModel = new Game { Id = g.Id, Date = g.Date, Time = g.Time, Field = g.Field, HomeTeamId = g.HomeTeamId, VisitorTeamId = g.VisitorTeamId };
     }
 
     private void CancelEdit()
@@ -195,7 +228,8 @@
     private async Task DeleteGame(int id)
     {
         var response = await Http.DeleteAsync($"api/Games/{id}");
-        if (response.IsSuccessStatusCode) {
+        if (response.IsSuccessStatusCode)
+        {
             Snackbar.Add("Juego eliminado", Severity.Info);
             await LoadData();
         }

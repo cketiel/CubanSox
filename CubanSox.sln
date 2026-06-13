@@ -1,13 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 18
-VisualStudioVersion = 18.6.11806.211 stable
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36429.23 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CubanSox.Backend", "src/CubanSox.Backend/CubanSox.Backend.csproj", "{9183002D-5634-4D9C-A2EA-7374A2843592}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CubanSox.Backend", "src\CubanSox.Backend\CubanSox.Backend.csproj", "{9183002D-5634-4D9C-A2EA-7374A2843592}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CubanSox.Web", "src/CubanSox.Web/CubanSox.Web/CubanSox.Web.csproj", "{51A5FEFF-6601-4C7A-AED6-32554F27FC5C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CubanSox.Web", "src\CubanSox.Web\CubanSox.Web\CubanSox.Web.csproj", "{51A5FEFF-6601-4C7A-AED6-32554F27FC5C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CubanSox.Web.Client", "src/CubanSox.Web/CubanSox.Web.Client/CubanSox.Web.Client.csproj", "{99C12D3E-05A2-4629-ADA4-D0D97ABCE67A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CubanSox.Web.Client", "src\CubanSox.Web\CubanSox.Web.Client\CubanSox.Web.Client.csproj", "{99C12D3E-05A2-4629-ADA4-D0D97ABCE67A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
