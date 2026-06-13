@@ -2,6 +2,7 @@
 @using CubanSox.Web.Models
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 @using Microsoft.AspNetCore.Components.Forms
 @using System.IO
@@ -222,6 +223,31 @@
     }
 
     private async Task DeleteTeam(int id)
+    {
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<SecurityDialog>("Eliminar Equipo", options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data?.ToString() == "admin")
+        {
+            var response = await Http.DeleteAsync($"api/Teams/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Equipo eliminado", Severity.Info);
+                await LoadTeams();
+            }
+            else
+            {
+                Snackbar.Add("No se pudo eliminar el equipo. Verifique si tiene jugadores asignados.", Severity.Error);
+            }
+        }
+        else if (!result.Canceled)
+        {
+            Snackbar.Add("Código incorrecto.", Severity.Error);
+        }
+    }
+
+    private async Task DeleteTeamOld(int id)
     {
         await Http.DeleteAsync($"api/Teams/{id}");
         await LoadTeams();

@@ -13,7 +13,8 @@ builder.Services.AddRazorComponents()
 // Configurar HttpClient para que apunte a la URL de tu API
 builder.Services.AddScoped(sp => new HttpClient
 {
-    BaseAddress = new Uri("https://localhost:7274/") 
+    BaseAddress = new Uri("https://kn9pct61-7274.usw3.devtunnels.ms/") 
+    //BaseAddress = new Uri("https://localhost:7274/") 
 });
 
 // Registrar servicios de MudBlazor

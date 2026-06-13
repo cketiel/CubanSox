@@ -1,6 +1,7 @@
 ﻿@using CubanSox.Web.Models
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <MudDialog>
    
@@ -525,6 +526,77 @@
     }
 
     private async Task Save()
+    {
+        // 1. Pedir el código de seguridad antes de procesar nada
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<SecurityDialog>("Verificación", options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            string codeEntered = result.Data?.ToString() ?? "";
+
+            // 2. Verificar si el código es correcto
+            if (codeEntered == "admin")
+            {
+                // CÓDIGO CORRECTO: Ejecutamos toda la lógica de guardado que ya tenías
+                try
+                {
+                    loading = true; // Mostrar que está procesando
+                    StateHasChanged();
+
+                    // --- TU LÓGICA ORIGINAL DE GUARDADO ---
+                    // 1. GUARDAR BOXSCORES
+                    foreach (var bs in boxScores)
+                    {
+                        var tempTeam = bs.Team;
+                        bs.Team = null;
+                        bs.Game = null;
+                        await Http.PostAsJsonAsync("api/BoxScores", bs);
+                        bs.Team = tempTeam;
+                    }
+
+                    // 2. GUARDAR BATTING STATS
+                    bool battingError = false;
+                    foreach (var stat in battingStats)
+                    {
+                        if (stat.PlayerId == 0) continue;
+                        var tempPlayer = stat.Player;
+                        stat.Player = null;
+                        var response = await Http.PostAsJsonAsync("api/BattingStats", stat);
+                        if (!response.IsSuccessStatusCode) battingError = true;
+                        stat.Player = tempPlayer;
+                    }
+
+                    if (battingError)
+                    {
+                        Snackbar.Add("Se guardaron resultados, pero hubo errores en estadísticas individuales.", Severity.Warning);
+                    }
+                    else
+                    {
+                        Snackbar.Add("Resultado y estadísticas guardados correctamente", Severity.Success);
+                        MudDialog.Close(DialogResult.Ok(true));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add("Error crítico: " + ex.Message, Severity.Error);
+                }
+                finally
+                {
+                    loading = false;
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                // CÓDIGO INCORRECTO
+                Snackbar.Add("Código incorrecto. No tiene permisos para guardar resultados.", Severity.Error);
+            }
+        }
+    }
+
+    private async Task Save2()
     {
         try
         {

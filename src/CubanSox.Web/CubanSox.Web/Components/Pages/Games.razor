@@ -174,7 +174,47 @@
         return "font-weight: 700; color: #424242;"; // Empate o inicial
     }
 
-    // --- El resto de los métodos (OpenScoreDialog, SaveGame, etc.) se mantienen igual ---
+    private async Task OpenScoreDialogWithSecurity(Game game)
+    {
+        // 1. Abrimos primero el diálogo de seguridad
+        var securityOptions = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var securityDialog = await DialogService.ShowAsync<SecurityDialog>("Seguridad", securityOptions);
+        var securityResult = await securityDialog.Result;
+
+        // 2. Si el usuario no canceló el diálogo...
+        if (!securityResult.Canceled)
+        {
+            string codeEntered = securityResult.Data?.ToString() ?? "";
+
+            // 3. Verificamos si el código es correcto
+            if (codeEntered == "admin")
+            {
+                // CÓDIGO CORRECTO: Abrimos el GameScoreDialog original
+                var parameters = new DialogParameters<GameScoreDialog> { { x => x.Game, game } };
+                var options = new DialogOptions
+                {
+                    MaxWidth = MaxWidth.Large,
+                    FullWidth = true,
+                    CloseButton = true,
+                    BackdropClick = false
+                };
+
+                var dialog = await DialogService.ShowAsync<GameScoreDialog>("Box Score Detallado", parameters, options);
+                var result = await dialog.Result;
+
+                if (!result.Canceled)
+                {
+                    await LoadData();
+                }
+            }
+            else
+            {
+                // CÓDIGO INCORRECTO: Mostramos error
+                Snackbar.Add("Código incorrecto. No tiene permisos para editar.", Severity.Error);
+            }
+        }
+    }
+   
     private async Task OpenScoreDialog(Game game)
     {
         var parameters = new DialogParameters<GameScoreDialog> { { x => x.Game, game } };
@@ -226,6 +266,27 @@
     }
 
     private async Task DeleteGame(int id)
+    {
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<SecurityDialog>("Eliminar Juego", options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data?.ToString() == "admin")
+        {
+            var response = await Http.DeleteAsync($"api/Games/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Juego eliminado del calendario", Severity.Info);
+                await LoadData();
+            }
+        }
+        else if (!result.Canceled)
+        {
+            Snackbar.Add("Código incorrecto. Acción cancelada.", Severity.Error);
+        }
+    }
+
+    private async Task DeleteGameOld(int id)
     {
         var response = await Http.DeleteAsync($"api/Games/{id}");
         if (response.IsSuccessStatusCode)
