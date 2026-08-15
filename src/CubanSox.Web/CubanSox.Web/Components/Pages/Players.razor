@@ -99,6 +99,11 @@
         *@
         <MudTd DataLabel="Equipo">@context.Team?.Name</MudTd>
         <MudTd Style="text-align:right">
+            <MudIconButton Icon="@Icons.Material.Filled.Badge"
+                           Color="Color.Primary"
+                           OnClick="@(() => OpenPlayerSheet(context))"
+                           Title="Ver Ficha Técnica" />
+
             <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" OnClick="@(() => PrepareEdit(context))" />
             <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => DeletePlayer(context.Id))" />
         </MudTd>
@@ -210,4 +215,34 @@
         if (dob.Date > today.AddYears(-age)) age--;
         return age;
     }
+
+    private async Task OpenPlayerSheet(Player player)
+    {
+        var parameters = new DialogParameters<PlayerCardDialog> { { x => x.Player, player } };
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            NoHeader = true // Para dar el look de tarjeta limpia
+        };
+
+        await DialogService.ShowAsync<PlayerCardDialog>("", parameters, options);
+    }
+
+    private async Task OpenPlayerCard(Player p)
+    {
+        var parameters = new DialogParameters<PlayerCardDialog> { { x => x.Player, p } };
+        var options = new DialogOptions
+        {
+            CloseButton = false, // Ponemos false porque ya creamos nuestro botón en TitleContent
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            NoHeader = true
+            
+        };
+
+        await DialogService.ShowAsync<PlayerCardDialog>("Ficha del Jugador", parameters, options);
+    }
+
 }

@@ -122,57 +122,68 @@
 
     
 
-    
+    private bool _isDialogOpen = false;
 
     private async Task OpenLeaderList(string key, string title)
     {
-        Console.WriteLine($"Abriendo líder: {title}");
-        var sortedList = allPlayerStats
-            .OrderByDescending(x => GetValueByField(x, key))
-            .Take(10)
-            .ToList();
+        if (_isDialogOpen) return; // Si ya se está abriendo, ignorar
+        _isDialogOpen = true;
 
-        var leadersToDisplay = new List<LeaderDetailDTO>();
-        double lastValue = -1;
-        int actualRank = 1;
+        try{
+            Console.WriteLine($"Abriendo líder: {title}");
+            var sortedList = allPlayerStats
+                .Where(x => x.AB > 5)
+                .OrderByDescending(x => GetValueByField(x, key))
+                .Take(10)
+                .ToList();
 
-        for (int i = 0; i < sortedList.Count; i++)
-        {
-            var current = sortedList[i];
-            double currentValue = GetValueByField(current, key);
+            var leadersToDisplay = new List<LeaderDetailDTO>();
+            double lastValue = -1;
+            int actualRank = 1;
 
-            if (i > 0 && currentValue == lastValue) { /* mantiene rank */ }
-            else { actualRank = i + 1; }
-
-            var p = allPlayers.FirstOrDefault(x => x.Id == current.PlayerId);
-            var t = allTeams.FirstOrDefault(x => x.Id == p?.TeamId);
-
-            leadersToDisplay.Add(new LeaderDetailDTO
+            for (int i = 0; i < sortedList.Count; i++)
             {
-                DisplayRank = actualRank,
-                Name = p?.Name ?? "---",
-                Photo = p?.Photo,
-                TeamLogo = t?.Logo,
-                Value = currentValue
-            });
-            lastValue = currentValue;
-        }
+                var current = sortedList[i];
+                double currentValue = GetValueByField(current, key);
 
-        //var parameters = new DialogParameters { ["Leaders"] = leadersToDisplay, ["CategoryCode"] = key };
-        //var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var parameters = new DialogParameters();
-        parameters.Add("Leaders", leadersToDisplay);
-        parameters.Add("CategoryCode", key);
+                if (i > 0 && currentValue == lastValue) { /* mantiene rank */ }
+                else { actualRank = i + 1; }
 
-        var options = new DialogOptions
-        {
-            CloseButton = true,
-            MaxWidth = MaxWidth.Medium,
-            FullWidth = true,
+                var p = allPlayers.FirstOrDefault(x => x.Id == current.PlayerId);
+                var t = allTeams.FirstOrDefault(x => x.Id == p?.TeamId);
+
+                leadersToDisplay.Add(new LeaderDetailDTO
+                {
+                    DisplayRank = actualRank,
+                    Name = p?.Name ?? "---",
+                    Photo = p?.Photo,
+                    TeamLogo = t?.Logo,
+                    Value = currentValue
+                });
+                lastValue = currentValue;
+            }
+
+            //var parameters = new DialogParameters { ["Leaders"] = leadersToDisplay, ["CategoryCode"] = key };
+            //var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+            var parameters = new DialogParameters();
+            parameters.Add("Leaders", leadersToDisplay);
+            parameters.Add("CategoryCode", key);
+
+            var options = new DialogOptions
+            {
+                CloseButton = false,
+                MaxWidth = MaxWidth.Medium,
+                FullWidth = true,
             
-            BackgroundClass = "leader-dialog-overlay"
-        };
-        await DialogService.ShowAsync<LeaderListDialog>(title, parameters, options);
+                BackgroundClass = "leader-dialog-overlay"
+            };
+            var dialog = await DialogService.ShowAsync<LeaderListDialog>(title, parameters, options);
+            await dialog.Result; // Esperamos a que cierre
+        }
+        finally
+        {
+            _isDialogOpen = false; // Liberamos el candado
+        }
     }
 
     private double GetValueByField(PlayerStatSummary stat, string key)
@@ -265,7 +276,7 @@
 
         foreach (var key in leaders.Keys.ToList())
         {
-            var top = allPlayerStats.OrderByDescending(x => GetValueByField(x, key)).FirstOrDefault();
+            var top = allPlayerStats.Where(x => x.AB > 5).OrderByDescending(x => GetValueByField(x, key)).FirstOrDefault();
             if (top != null)
             {
                 var p = allPlayers.FirstOrDefault(x => x.Id == top.PlayerId);

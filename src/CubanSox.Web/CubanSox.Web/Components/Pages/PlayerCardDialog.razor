@@ -1,0 +1,494 @@
+﻿@using CubanSox.Web.Models
+@inject HttpClient Http
+
+<MudDialog Class="player-card-root" DisableSidePadding="true">
+    <DialogContent>
+        <div class="master-container">
+            <button class="glass-close-btn" @onclick="Close">×</button>
+
+            <!-- PANEL IZQUIERDO -->
+            <div class="panel-left">
+                <div class="background-star">★</div>
+
+                <!-- CINTA MEJORADA: Más ancha y proporcional -->
+                <div class="jersey-ribbon-pro">
+                    <span class="ribbon-hash">#</span>@Player.Number
+                </div>
+
+                <div class="identity-header">
+                    <span class="fname">@FirstName</span>
+                    <h1 class="lname">@LastName</h1>
+                    <div class="team-tag">@Player.Team?.Name.ToUpper()</div>
+                </div>
+
+                <div class="photo-stage">
+                    <div class="photo-ring-neon">
+                        @if (!string.IsNullOrEmpty(Player.Photo))
+                        {
+                            <img src="@Player.Photo" class="player-main-img" />
+                        }
+                    </div>
+                </div>
+
+                <!-- BLOQUE DE POSICIONES -->
+                <div class="positions-box-pro">
+                    <div class="pos-content-left">
+                        <span class="pos-title">HISTORIAL POSICIONES:</span>
+                        <span class="pos-list">@PlayedPositions</span>
+                    </div>
+                    <div class="pos-primary-right">
+                        <span class="pref-label">PRIMARIA</span>
+                        <span class="main-pos-neon-3d">@MainPosition</span>
+                    </div>
+                </div>
+
+                <div class="edge-fader"></div>
+            </div>
+
+            <!-- PANEL DERECHO -->
+            <div class="panel-right">
+                <div class="neon-frame">
+                    <!-- CABECERA: Logo + 4 Stats (Ajustado para Mobile) -->
+                    <div class="top-stats-flex">
+                        <div class="logo-circle">
+                            @if (!string.IsNullOrEmpty(Player.Team?.Logo))
+                            {
+                                <img src="@Player.Team.Logo" class="logo-render" />
+                            }
+                        </div>
+
+                        <div class="big-stats-stack">
+                            @foreach (var stat in displayStats.Take(4))
+                            {
+                                <div class="row-big">
+                                    <span class="val-big">@stat.Value</span>
+                                    <span class="lbl-red">@stat.Label</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="divider-fx"></div>
+
+                    <!-- GRILLA DE CONTEO -->
+                    <div class="stats-grid-container">
+                        @foreach (var stat in displayStats.Skip(4))
+                        {
+                            <div class="grid-item-fx">
+                                <span class="val-small">@stat.Value</span>
+                                <span class="lbl-mini">@stat.Label</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </DialogContent>
+</MudDialog>
+
+<style>
+    :root {
+        --deep-navy: #020b24;
+        --accent-blue: #0a2e7a;
+        --neon-glow: #00d2ff;
+        --fire-red: #d32f2f;
+        --gold-yellow: #f9d423;
+    }
+
+    .player-card-root {
+        background-color: var(--deep-navy) !important;
+        max-width: 950px !important;
+        border-radius: 12px !important;
+        overflow: hidden;
+    }
+
+        .player-card-root .mud-dialog-content {
+            padding: 0 !important;
+        }
+
+    .master-container {
+        display: flex;
+        flex-direction: row;
+        min-height: 620px;
+        background: var(--deep-navy);
+        position: relative;
+    }
+
+    /* --- PANEL IZQUIERDO --- */
+    .panel-left {
+        flex: 1.1;
+        padding: 30px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background: linear-gradient(135deg, #020b24 0%, #051a4f 100%);
+        overflow: hidden;
+    }
+
+    /* CINTA PRO: Ajustada para números de 2 dígitos */
+    .jersey-ribbon-pro {
+        position: absolute;
+        top: 0;
+        right: 40px;
+        background: rgba(0, 0, 0, 0.6);
+        color: var(--gold-yellow);
+        width: 65px; /* Aumentado sutilmente */
+        padding: 18px 5px 32px;
+        text-align: center;
+        font-weight: 900;
+        font-size: 2.2rem; /* Tamaño proporcional */
+        z-index: 10;
+        clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 88%, 0 100%);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+    }
+
+    .ribbon-hash {
+        font-size: 0.75rem;
+        opacity: 0.8;
+        vertical-align: super;
+        margin-right: 1px;
+    }
+
+    .background-star {
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        font-size: 85px;
+        color: white;
+        opacity: 0.18;
+        transform: rotate(-15deg);
+        z-index: 0;
+    }
+
+    .identity-header {
+        z-index: 2;
+        margin-top: 20px;
+    }
+
+    .fname {
+        font-size: 1rem;
+        color: white;
+        letter-spacing: 3px;
+        font-weight: 300;
+    }
+
+    .lname {
+        font-size: 2.8rem;
+        font-weight: 900;
+        color: white;
+        font-style: italic;
+        text-transform: uppercase;
+        margin: 0;
+        line-height: 0.9;
+    }
+
+    .team-tag {
+        color: var(--gold-yellow);
+        font-style: italic;
+        font-weight: 800;
+        font-size: 1.1rem;
+    }
+
+    .photo-stage {
+        flex-grow: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1;
+    }
+
+    .photo-ring-neon {
+        padding: 4px;
+        background: var(--neon-glow);
+        border-radius: 12px;
+        box-shadow: 0 0 20px var(--neon-glow);
+    }
+
+    .player-main-img {
+        width: 260px;
+        height: 320px;
+        object-fit: cover;
+        border-radius: 10px;
+    }
+
+    /* POSICIONES */
+    .positions-box-pro {
+        background: rgba(0, 0, 0, 0.5);
+        padding: 10px 15px;
+        border-radius: 8px;
+        border-left: 4px solid var(--neon-glow);
+        z-index: 10;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .pos-content-left {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    .pos-title {
+        color: var(--neon-glow);
+        font-weight: 900;
+        font-size: 0.7rem;
+    }
+
+    .pos-list {
+        color: white;
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+
+    .pos-primary-right {
+        text-align: right;
+        border-left: 1px solid rgba(255,255,255,0.1);
+        padding-left: 15px;
+    }
+
+    .pref-label {
+        color: var(--gold-yellow);
+        font-size: 0.6rem;
+        font-weight: 900;
+        display: block;
+    }
+
+    .main-pos-neon-3d {
+        font-size: 2.2rem;
+        font-weight: 900;
+        font-style: italic;
+        color: white;
+        line-height: 1;
+        text-shadow: 0 0 5px var(--neon-glow), 0 0 10px var(--neon-glow), 2px 2px 2px rgba(0,0,0,0.9);
+    }
+
+    .edge-fader {
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: 40px;
+        background: linear-gradient(90deg, transparent, var(--deep-navy));
+        z-index: 5;
+    }
+
+    /* --- PANEL DERECHO --- */
+    .panel-right {
+        flex: 1.2;
+        padding: 20px;
+        background: var(--deep-navy);
+        z-index: 6;
+    }
+
+    .neon-frame {
+        height: 100%;
+        border: 2px solid var(--neon-glow);
+        border-radius: 12px;
+        padding: 20px;
+        background: radial-gradient(circle at center, #0a2e7a 0%, #020b24 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .top-stats-flex {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        margin-bottom: 10px;
+    }
+
+    .logo-circle {
+        background: rgba(255,255,255,0.08);
+        padding: 8px;
+        border-radius: 50%;
+        width: 100px;
+        height: 100px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .logo-render {
+        max-width: 90%;
+        max-height: 90%;
+        object-fit: contain;
+        mix-blend-mode: lighten;
+    }
+
+    .row-big {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+
+    .val-big {
+        font-size: 2.4rem;
+        font-weight: 900;
+        color: var(--gold-yellow);
+        font-style: italic;
+        line-height: 1;
+    }
+
+    .lbl-red {
+        background: var(--fire-red);
+        color: white;
+        padding: 1px 6px;
+        font-weight: 900;
+        font-size: 0.8rem;
+        border-radius: 3px;
+        min-width: 45px;
+        text-align: center;
+    }
+
+    .divider-fx {
+        height: 2px;
+        min-height: 2px;
+        background: linear-gradient(90deg, transparent, var(--neon-glow), transparent);
+        margin: 15px 0;
+    }
+
+    .stats-grid-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .grid-item-fx {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: linear-gradient(90deg, transparent, rgba(0, 210, 255, 0.1), transparent);
+        padding: 5px;
+    }
+
+    .val-small {
+        font-size: 1.7rem;
+        font-weight: 900;
+        color: white;
+        font-family: 'Impact';
+    }
+
+    .lbl-mini {
+        background: var(--fire-red);
+        color: white;
+        padding: 1px 5px;
+        font-weight: 900;
+        font-size: 0.75rem;
+        border-radius: 3px;
+        min-width: 40px;
+        text-align: center;
+    }
+
+    .glass-close-btn {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background: rgba(255,255,255,0.1);
+        border: none;
+        color: white;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        cursor: pointer;
+        z-index: 100;
+    }
+
+    /* --- CORRECCIONES MOBILE --- */
+    @@media (max-width: 960px) {
+        .master-container {
+            flex-direction: column;
+        }
+
+        .edge-fader {
+            display: none;
+        }
+
+        .jersey-ribbon-pro {
+            right: 20px;
+            width: 55px;
+            font-size: 1.8rem;
+        }
+        /* Regresamos el logo a un tamaño adecuado y lo centramos sobre las stats */
+        .top-stats-flex {
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .logo-circle {
+            width: 90px;
+            height: 90px;
+        }
+
+        .big-stats-stack {
+            width: 100%;
+        }
+
+        .row-big {
+            justify-content: center;
+        }
+        /* Centrado en Mobile */
+
+        .positions-box-pro {
+            margin-top: 15px;
+        }
+    }
+</style>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialogInstance { get; set; }
+    [Parameter] public Player Player { get; set; }
+
+    private string FirstName => Player.Name.Split(' ')[0];
+    private string LastName => string.Join(" ", Player.Name.Split(' ').Skip(1));
+    private string PlayedPositions = "N/A";
+    private string MainPosition = "N/A";
+    private List<StatDisplay> displayStats = new();
+    private bool isStatsLoading = true;
+
+    void Close() => MudDialogInstance.Cancel();
+
+    protected override async Task OnInitializedAsync() => await LoadRealStats();
+
+    private async Task LoadRealStats()
+    {
+        isStatsLoading = true;
+        try
+        {
+            var allStats = await Http.GetFromJsonAsync<List<BattingStat>>("api/BattingStats");
+            if (allStats != null)
+            {
+                var pStats = allStats.Where(s => s.PlayerId == Player.Id).ToList();
+                var rawPosList = pStats.Where(s => !string.IsNullOrEmpty(s.Position)).Select(s => s.Position.ToUpper().Trim()).Select(p => p == "C" ? "R" : p).ToList();
+                PlayedPositions = string.Join(", ", rawPosList.Distinct().OrderBy(x => x));
+                MainPosition = rawPosList.GroupBy(x => x).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault() ?? "BAT";
+
+                int h = pStats.Sum(s => s.H), d2b = pStats.Sum(s => s.Doubles), t3b = pStats.Sum(s => s.Triples), hr = pStats.Sum(s => s.HR);
+                int ab = pStats.Sum(s => s.AB), bb = pStats.Sum(s => s.BB), so = pStats.Sum(s => s.SO), r = pStats.Sum(s => s.R), rbi = pStats.Sum(s => s.RBI);
+                int hbp = pStats.Sum(s => s.HBP), sf = pStats.Sum(s => s.SF), sb = pStats.Sum(s => s.SB), e = pStats.Sum(s => s.E);
+                int hits = h + d2b + t3b + hr;
+                int pa = ab + bb + hbp + sf;
+                double avg = ab > 0 ? (double)hits / ab : 0;
+                double slg = ab > 0 ? (double)(h + 2 * d2b + 3 * t3b + 4 * hr) / ab : 0;
+                double obp = pa > 0 ? (double)(hits + bb + hbp) / pa : 0;
+
+                displayStats = new List<StatDisplay> {
+                    new ("AVG", avg.ToString(".000")), new ("SLG", slg.ToString(".000")), new ("OBP", obp.ToString(".000")), new ("OPS", (obp+slg).ToString(".000")),
+                    new ("PA", pa.ToString()), new ("VB", ab.ToString()), new ("H", hits.ToString()), new ("2B", d2b.ToString()), new ("3B", t3b.ToString()), new ("HR", hr.ToString()),
+                    new ("K", so.ToString()), new ("BB", bb.ToString()), new ("CA", r.ToString()), new ("CI", rbi.ToString()), new ("DB", hbp.ToString()), new ("SF", sf.ToString()),
+                    new ("BR", sb.ToString()), new ("E", e.ToString())
+                };
+            }
+        }
+        catch { }
+        finally { isStatsLoading = false; }
+    }
+    public record StatDisplay(string Label, string Value);
+}
